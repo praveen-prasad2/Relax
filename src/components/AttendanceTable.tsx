@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { HiOutlinePencilSquare } from "react-icons/hi2";
 import { formatMinutesToDisplay, formatDateDDMMYYYY, formatWorkingTime } from "@/lib/attendance-calculator";
+
+type FilterType = "all" | "leave" | "holiday" | "worked";
 
 interface Row {
   _id?: string;
@@ -30,8 +32,17 @@ export function AttendanceTable({
 }) {
   const queryClient = useQueryClient();
   const todayStr = new Date().toISOString().slice(0, 10);
+  const [filter, setFilter] = useState<FilterType>("all");
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Row>>({});
+
+  const filteredRows = useMemo(() => {
+    if (filter === "all") return rows;
+    if (filter === "leave") return rows.filter((r) => r.isLeave === "Leave");
+    if (filter === "holiday") return rows.filter((r) => r.isHoliday);
+    if (filter === "worked") return rows.filter((r) => r.isLeave !== "Leave" && !r.isHoliday);
+    return rows;
+  }, [rows, filter]);
 
   const mutation = useMutation({
     mutationFn: (payload: { date: string; punchIn?: string; punchOut?: string; isLeave?: string; isHoliday?: boolean }) =>
@@ -70,8 +81,26 @@ export function AttendanceTable({
 
   const headerLabels = ["Date", "Day", "In", "Out", "Leave", "Holiday", "Worked", "Daily Diff", "Total Diff", "Actions"];
 
+  const filterButtons: { key: FilterType; label: string; className: string }[] = [
+    { key: "all", label: "All", className: filter === "all" ? "bg-[#4F46E5] text-white" : "bg-white text-[#6B7280] border border-[#E5E7EB]" },
+    { key: "leave", label: "Leave", className: filter === "leave" ? "bg-orange-500 text-white" : "bg-orange-100 text-orange-700 border border-orange-200" },
+    { key: "holiday", label: "Holiday", className: filter === "holiday" ? "bg-amber-500 text-white" : "bg-amber-100 text-amber-700 border border-amber-200" },
+    { key: "worked", label: "Worked", className: filter === "worked" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+  ];
+
   return (
     <div className="overflow-x-auto -mx-4 px-4">
+      <div className="flex flex-wrap gap-2 mb-3">
+        {filterButtons.map(({ key, label, className }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${className}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="min-w-[650px] space-y-2">
         <div className="flex flex-wrap gap-x-2 gap-y-2 px-3 py-2 text-xs font-medium text-[#6B7280] border-b border-[#E5E7EB] mb-2">
           {headerLabels.map((l, i) => (
@@ -80,7 +109,7 @@ export function AttendanceTable({
             </span>
           ))}
         </div>
-        {rows.map((row, i) => {
+        {filteredRows.map((row, i) => {
           const isToday = row.date === todayStr;
           const isFuture = row.date > todayStr;
           const canEdit = !isFuture;
@@ -160,8 +189,12 @@ export function AttendanceTable({
                     <span className="min-w-[55px] text-[#6B7280]">
                       {row.punchOut ? new Date(row.punchOut).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "-"}
                     </span>
-                    <span className="min-w-[45px] text-[#6B7280]">{row.isLeave}</span>
-                    <span className="min-w-[45px] text-[#6B7280]">{row.isHoliday ? "Yes" : "-"}</span>
+                    <span className={`min-w-[45px] ${row.isLeave === "Leave" ? "rounded-md bg-orange-500 px-2 py-0.5 text-sm font-medium text-white" : "text-[#6B7280]"}`}>
+                      {row.isLeave}
+                    </span>
+                    <span className={`min-w-[45px] ${row.isHoliday ? "rounded-md bg-purple-300 px-2 py-0.5 text-sm font-medium text-black " : "text-[#6B7280]"}`}>
+                      {row.isHoliday ? "Yes" : "-"}
+                    </span>
                     <span className="min-w-[60px] text-[#6B7280]">{formatWorkingTime(row.workingMinutes)}</span>
                     <span className={`min-w-[55px] font-medium ${!isFuture && (row.differenceMinutes > 0 ? "text-emerald-600" : row.differenceMinutes < 0 ? "text-red-600" : "text-[#6B7280]")}`}>
                       {isFuture ? "-" : formatMinutesToDisplay(row.differenceMinutes)}
