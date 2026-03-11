@@ -24,6 +24,17 @@ A mobile-first personal productivity app with Attendance Calculator, Folder-base
 3. Configure SMTP (nodemailer) for OTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`. For Gmail, use an [App Password](https://support.google.com/accounts/answer/185833)
 4. `npm install && npm run dev`
 
+## Vercel Deployment
+
+Add these environment variables in **Project Settings > Environment Variables** (all environments):
+
+| Variable | Value |
+|----------|-------|
+| `MONGODB_URI` | Your MongoDB Atlas connection string |
+| `NEXTAUTH_SECRET` | Run `openssl rand -base64 32` to generate |
+| `NEXTAUTH_URL` | `https://your-app.vercel.app` (your production URL) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | For OTP emails |
+
 ## Project Structure
 
 ```
