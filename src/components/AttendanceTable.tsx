@@ -31,7 +31,10 @@ export function AttendanceTable({
   month: number;
 }) {
   const queryClient = useQueryClient();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  })();
   const [filter, setFilter] = useState<FilterType>("all");
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Row>>({});

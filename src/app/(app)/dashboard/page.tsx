@@ -16,7 +16,11 @@ function CardSkeleton() {
 export default function DashboardPage() {
   const { data: today, isLoading: todayLoading } = useQuery({
     queryKey: ["attendance-today"],
-    queryFn: () => fetch("/api/attendance/today").then((r) => r.json()),
+    queryFn: () => {
+      const n = new Date();
+      const d = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+      return fetch(`/api/attendance/today?date=${d}`).then((r) => r.json());
+    },
     refetchOnWindowFocus: true,
     refetchInterval: 60_000,
   });

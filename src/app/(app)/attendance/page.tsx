@@ -68,7 +68,10 @@ export default function AttendancePage() {
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-semibold text-[#111827]">{monthLabel}</h1>
             {!isLoading && data?.rows?.length > 0 && (() => {
-              const todayStr = new Date().toISOString().slice(0, 10);
+              const todayStr = (() => {
+                const n = new Date();
+                return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+              })();
               const lastRowUpToToday = [...data.rows].reverse().find((r: { date: string }) => r.date <= todayStr);
               const total = lastRowUpToToday?.totalDifferenceMinutes ?? data.rows[data.rows.length - 1]?.totalDifferenceMinutes ?? 0;
               return (
