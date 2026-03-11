@@ -17,6 +17,8 @@ export default function DashboardPage() {
   const { data: today, isLoading: todayLoading } = useQuery({
     queryKey: ["attendance-today"],
     queryFn: () => fetch("/api/attendance/today").then((r) => r.json()),
+    refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
   });
   const { data: folders, isLoading: foldersLoading } = useQuery({
     queryKey: ["folders"],

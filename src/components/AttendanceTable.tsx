@@ -53,14 +53,21 @@ export function AttendanceTable({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       setEditingRow(null);
     },
   });
 
+  const formatTimeAsEntered = (iso: string | null) => {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  };
+
   const timeToInput = (iso: string | null) => {
     if (!iso) return "";
     const d = new Date(iso);
-    return d.toTimeString().slice(0, 5);
+    return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
   };
 
   const startEdit = (row: Row) => {
@@ -183,12 +190,8 @@ export function AttendanceTable({
                       {isToday && <span className="ml-1 text-[#4F46E5] text-xs">Today</span>}
                     </div>
                     <span className="min-w-[70px] text-[#6B7280]">{row.dayName}</span>
-                    <span className="min-w-[55px] text-[#6B7280]">
-                      {row.punchIn ? new Date(row.punchIn).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "-"}
-                    </span>
-                    <span className="min-w-[55px] text-[#6B7280]">
-                      {row.punchOut ? new Date(row.punchOut).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "-"}
-                    </span>
+                    <span className="min-w-[55px] text-[#6B7280]">{formatTimeAsEntered(row.punchIn)}</span>
+                    <span className="min-w-[55px] text-[#6B7280]">{formatTimeAsEntered(row.punchOut)}</span>
                     <span className={`min-w-[45px] ${row.isLeave === "Leave" ? "rounded-md bg-orange-500 px-2 py-0.5 text-sm font-medium text-white" : "text-[#6B7280]"}`}>
                       {row.isLeave}
                     </span>

@@ -12,9 +12,13 @@ export default function AttendancePage() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
 
+  const isViewingCurrentMonth =
+    year === new Date().getFullYear() && month === new Date().getMonth() + 1;
   const { data, isLoading } = useQuery({
     queryKey: ["attendance", year, month],
     queryFn: () => fetch(`/api/attendance?year=${year}&month=${month}`).then((r) => r.json()),
+    refetchOnWindowFocus: true,
+    refetchInterval: isViewingCurrentMonth ? 60_000 : false,
   });
 
   const monthLabel = useMemo(() => {
