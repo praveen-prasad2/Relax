@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { HiOutlinePlus } from "react-icons/hi2";
-import { formatMinutesToDisplay, formatWorkingTime } from "@/lib/attendance-calculator";
+import { formatMinutesToDisplay, formatWorkingTime, getAttendanceMonthFromDate } from "@/lib/attendance-calculator";
 import { FolderCard } from "@/components/FolderCard";
 
 function CardSkeleton() {
@@ -26,6 +26,10 @@ export default function DashboardPage() {
   const todayStatus = today?.today;
   const monthlyDiff = today?.monthlyDifferenceMinutes ?? 0;
   const recentFolders = (folders ?? []).slice(0, 4);
+  const currentMonth = (() => {
+    const { year, month } = getAttendanceMonthFromDate(new Date());
+    return new Date(year, month - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
+  })();
 
   return (
     <div className="space-y-6 px-4 py-6">
@@ -104,7 +108,7 @@ export default function DashboardPage() {
               <p className={`mt-1 text-lg font-bold ${monthlyDiff >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {formatMinutesToDisplay(monthlyDiff)}
               </p>
-              <p className="text-xs text-[#6B7280]">24th – 23rd cycle</p>
+              <p className="text-xs text-[#6B7280]">{currentMonth} (24th – 23rd cycle)</p>
             </motion.div>
           </Link>
         )}
