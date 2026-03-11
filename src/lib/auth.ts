@@ -4,13 +4,6 @@ import bcrypt from "bcryptjs";
 import { connectDB } from "./mongodb";
 import User from "@/models/User";
 
-if (!process.env.NEXTAUTH_SECRET) {
-  throw new Error("NEXTAUTH_SECRET is required. Add it in Vercel: Project Settings > Environment Variables.");
-}
-if (!process.env.NEXTAUTH_URL && process.env.VERCEL_URL) {
-  throw new Error("NEXTAUTH_URL is required on Vercel. Set to https://your-domain.vercel.app");
-}
-
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
