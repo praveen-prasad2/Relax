@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { HiOutlineChevronLeft, HiOutlineChevronRight } from "react-icons/hi2";
 import { formatMinutesToDisplay } from "@/lib/attendance-calculator";
@@ -20,6 +20,15 @@ export default function AttendancePage() {
     refetchOnWindowFocus: true,
     refetchInterval: isViewingCurrentMonth ? 60_000 : false,
   });
+
+  useEffect(() => {
+    const onMidnight = () => {
+      setYear(new Date().getFullYear());
+      setMonth(new Date().getMonth() + 1);
+    };
+    window.addEventListener("midnight", onMidnight);
+    return () => window.removeEventListener("midnight", onMidnight);
+  }, []);
 
   const monthLabel = useMemo(() => {
     const d = new Date(year, month - 1, 1);

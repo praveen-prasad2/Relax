@@ -58,17 +58,14 @@ export function AttendanceTable({
     },
   });
 
-  const formatTimeAsEntered = (iso: string | null) => {
-    if (!iso) return "-";
-    const d = new Date(iso);
-    return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  const parseTimeFromISO = (iso: string | null) => {
+    if (!iso) return null;
+    const m = iso.match(/T(\d{2}):(\d{2})/);
+    return m ? `${m[1]}:${m[2]}` : null;
   };
 
-  const timeToInput = (iso: string | null) => {
-    if (!iso) return "";
-    const d = new Date(iso);
-    return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
-  };
+  const formatTimeAsEntered = (iso: string | null) => parseTimeFromISO(iso) ?? "-";
+  const timeToInput = (iso: string | null) => parseTimeFromISO(iso) ?? "";
 
   const startEdit = (row: Row) => {
     setEditingRow(row.date);

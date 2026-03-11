@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { BottomNavbar } from "@/components/BottomNavbar";
 import { Header } from "@/components/Header";
+import { MidnightRefresher } from "@/components/MidnightRefresher";
 
 export default async function AppLayout({
   children,
@@ -14,6 +15,7 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-20">
+      <MidnightRefresher />
       <Header />
       <main className="mx-auto w-full max-w-lg md:max-w-none md:px-6">{children}</main>
       <BottomNavbar />
