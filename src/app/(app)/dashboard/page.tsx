@@ -72,16 +72,20 @@ export default function DashboardPage() {
                       ? "text-amber-600"
                       : todayStatus?.isLeave === "Leave"
                         ? "text-orange-600"
-                        : "text-[#4F46E5]"
+                        : todayStatus?.isLeave === "WFH"
+                          ? "text-blue-600"
+                          : "text-[#4F46E5]"
                   }`}
                 >
                   {todayStatus?.isHoliday
                     ? "Holiday"
                     : todayStatus?.isLeave === "Leave"
                       ? "Leave"
-                      : todayStatus?.punchIn
-                        ? "Logged"
-                        : "Not logged"}
+                      : todayStatus?.isLeave === "WFH"
+                        ? "WFH"
+                        : todayStatus?.punchIn
+                          ? "Logged"
+                          : "Not logged"}
                 </span>
               </div>
               {todayStatus?.workingMinutes !== undefined && todayStatus.workingMinutes > 0 && (

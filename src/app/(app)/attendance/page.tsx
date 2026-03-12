@@ -14,9 +14,17 @@ export default function AttendancePage() {
 
   const isViewingCurrentMonth =
     year === new Date().getFullYear() && month === new Date().getMonth() + 1;
+  const todayStr = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  })();
   const { data, isLoading } = useQuery({
     queryKey: ["attendance", year, month],
-    queryFn: () => fetch(`/api/attendance?year=${year}&month=${month}`).then((r) => r.json()),
+    queryFn: () => {
+      const n = new Date();
+      const t = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+      return fetch(`/api/attendance?year=${year}&month=${month}&today=${t}`).then((r) => r.json());
+    },
     refetchOnWindowFocus: true,
     refetchInterval: isViewingCurrentMonth ? 60_000 : false,
   });
@@ -68,10 +76,6 @@ export default function AttendancePage() {
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-semibold text-[#111827]">{monthLabel}</h1>
             {!isLoading && data?.rows?.length > 0 && (() => {
-              const todayStr = (() => {
-                const n = new Date();
-                return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-              })();
               const lastRowUpToToday = [...data.rows].reverse().find((r: { date: string }) => r.date <= todayStr);
               const total = lastRowUpToToday?.totalDifferenceMinutes ?? data.rows[data.rows.length - 1]?.totalDifferenceMinutes ?? 0;
               return (

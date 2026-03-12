@@ -32,6 +32,10 @@ export async function GET(req: NextRequest) {
       $match: {
         userId: user._id,
         date: { $gte: start, $lte: endOfToday },
+        $or: [
+          { date: { $lt: today } },
+          { punchOut: { $exists: true, $ne: null } },
+        ],
       },
     },
     { $group: { _id: null, sum: { $sum: "$differenceMinutes" } } },

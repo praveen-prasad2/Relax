@@ -18,7 +18,7 @@ const upsertSchema = z.object({
   date: z.string(),
   punchIn: z.string().optional().nullable(),
   punchOut: z.string().optional().nullable(),
-  isLeave: z.enum(["None", "Leave"]).optional(),
+  isLeave: z.enum(["None", "Leave", "WFH"]).optional(),
   isHoliday: z.boolean().optional(),
 });
 
@@ -38,6 +38,11 @@ export async function GET(req: NextRequest) {
     date: { $in: dates },
   }).lean();
   const map = new Map(records.map((r) => [toDateKey(new Date(r.date)), r]));
+  const todayParam = searchParams.get("today");
+  const todayStr =
+    todayParam && /^\d{4}-\d{2}-\d{2}$/.test(todayParam)
+      ? todayParam
+      : toDateKey(new Date());
   let runningDiff = 0;
   const rows = dates.map((date) => {
     const key = toDateKey(date);
@@ -55,7 +60,8 @@ export async function GET(req: NextRequest) {
       holiday,
       existing?.isLeave ?? "None"
     );
-    runningDiff += diff;
+    const isTodayNoOut = key === todayStr && !punchOut;
+    if (!isTodayNoOut) runningDiff += diff;
     return {
       _id: existing?._id,
       date: key,

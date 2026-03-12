@@ -7,7 +7,7 @@ const AttendanceSchema = new mongoose.Schema(
     dayName: { type: String, required: true },
     punchIn: { type: Date },
     punchOut: { type: Date },
-    isLeave: { type: String, enum: ["None", "Leave"], default: "None" },
+    isLeave: { type: String, enum: ["None", "Leave", "WFH"], default: "None" },
     isHoliday: { type: Boolean, default: false },
     workingMinutes: { type: Number, default: 0 },
     differenceMinutes: { type: Number, default: 0 },

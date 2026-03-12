@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { HiOutlinePencilSquare } from "react-icons/hi2";
 import { formatMinutesToDisplay, formatDateDDMMYYYY, formatWorkingTime } from "@/lib/attendance-calculator";
 
-type FilterType = "all" | "leave" | "holiday" | "worked";
+type FilterType = "all" | "leave" | "holiday" | "wfh" | "worked";
 
 interface Row {
   _id?: string;
@@ -43,7 +43,8 @@ export function AttendanceTable({
     if (filter === "all") return rows;
     if (filter === "leave") return rows.filter((r) => r.isLeave === "Leave");
     if (filter === "holiday") return rows.filter((r) => r.isHoliday);
-    if (filter === "worked") return rows.filter((r) => r.isLeave !== "Leave" && !r.isHoliday);
+    if (filter === "wfh") return rows.filter((r) => r.isLeave === "WFH");
+    if (filter === "worked") return rows.filter((r) => r.isLeave !== "Leave" && r.isLeave !== "WFH" && !r.isHoliday);
     return rows;
   }, [rows, filter]);
 
@@ -86,12 +87,13 @@ export function AttendanceTable({
     });
   };
 
-  const headerLabels = ["Date", "Day", "In", "Out", "Leave", "Holiday", "Worked", "Daily Diff", "Total Diff", "Actions"];
+  const headerLabels = ["Date", "Day", "In", "Out", "Leave/WFH", "Holiday", "Worked", "Daily Diff", "Total Diff", "Actions"];
 
   const filterButtons: { key: FilterType; label: string; className: string }[] = [
     { key: "all", label: "All", className: filter === "all" ? "bg-[#4F46E5] text-white" : "bg-white text-[#6B7280] border border-[#E5E7EB]" },
     { key: "leave", label: "Leave", className: filter === "leave" ? "bg-orange-500 text-white" : "bg-orange-100 text-orange-700 border border-orange-200" },
     { key: "holiday", label: "Holiday", className: filter === "holiday" ? "bg-amber-500 text-white" : "bg-amber-100 text-amber-700 border border-amber-200" },
+    { key: "wfh", label: "WFH", className: filter === "wfh" ? "bg-blue-500 text-white" : "bg-blue-100 text-blue-700 border border-blue-200" },
     { key: "worked", label: "Worked", className: filter === "worked" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-200" },
   ];
 
@@ -154,11 +156,12 @@ export function AttendanceTable({
                       />
                       <select
                         value={form.isLeave ?? "None"}
-                        onChange={(e) => setForm((f) => ({ ...f, isLeave: e.target.value as "None" | "Leave" }))}
+                        onChange={(e) => setForm((f) => ({ ...f, isLeave: e.target.value as "None" | "Leave" | "WFH" }))}
                         className="rounded-lg border border-[#E5E7EB] px-2 py-1.5 text-sm"
                       >
                         <option value="None">None</option>
                         <option value="Leave">Leave</option>
+                        <option value="WFH">WFH</option>
                       </select>
                       <label className="flex items-center gap-1.5">
                         <input
@@ -192,7 +195,11 @@ export function AttendanceTable({
                     <span className="min-w-[70px] text-[#6B7280]">{row.dayName}</span>
                     <span className="min-w-[55px] text-[#6B7280]">{formatTimeAsEntered(row.punchIn)}</span>
                     <span className="min-w-[55px] text-[#6B7280]">{formatTimeAsEntered(row.punchOut)}</span>
-                    <span className={`min-w-[45px] ${row.isLeave === "Leave" ? "rounded-md bg-orange-500 px-2 py-0.5 text-sm font-medium text-white" : "text-[#6B7280]"}`}>
+                    <span className={`min-w-[45px] ${
+                      row.isLeave === "Leave" ? "rounded-md bg-orange-500 px-2 py-0.5 text-sm font-medium text-white" :
+                      row.isLeave === "WFH" ? "rounded-md bg-blue-500 px-2 py-0.5 text-sm font-medium text-white" :
+                      "text-[#6B7280]"
+                    }`}>
                       {row.isLeave}
                     </span>
                     <span className={`min-w-[45px] ${row.isHoliday ? "rounded-md bg-purple-300 px-2 py-0.5 text-sm font-medium text-black " : "text-[#6B7280]"}`}>
