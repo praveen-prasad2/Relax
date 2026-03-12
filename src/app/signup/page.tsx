@@ -17,40 +17,60 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const parseJson = async (res: Response): Promise<{ error?: string; success?: boolean }> => {
+    const text = await res.text();
+    if (!text?.trim()) return {};
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { error: res.ok ? "Invalid response" : "Verification failed. Please try again." };
+    }
+  };
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const res = await fetch("/api/auth/send-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, username, password }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) {
-      setError(data.error || "Failed to send OTP");
-      return;
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, username, password }),
+      });
+      const data = await parseJson(res);
+      if (!res.ok) {
+        setError(data.error || "Failed to send OTP");
+        return;
+      }
+      setStep("otp");
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setStep("otp");
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const res = await fetch("/api/auth/verify-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) {
-      setError(data.error || "Verification failed");
-      return;
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp }),
+      });
+      const data = await parseJson(res);
+      if (!res.ok) {
+        setError(data.error || "Verification failed");
+        return;
+      }
+      router.push("/login?registered=1");
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    router.push("/login?registered=1");
   };
 
   return (
