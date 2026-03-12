@@ -11,14 +11,19 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
     const { email, otp } = parsed.data;
     await connectDB();
-    const record = await Otp.findOne({ email });
+    const record = await Otp.findOne({ email }).lean();
     if (!record) return NextResponse.json({ error: "OTP expired or invalid" }, { status: 400 });
     if (String(record.otp).trim() !== String(otp).trim()) return NextResponse.json({ error: "Invalid OTP" }, { status: 400 });
     if (new Date() > record.expiresAt) {
@@ -43,9 +48,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Verify OTP error:", err);
-    return NextResponse.json(
-      { error: process.env.NODE_ENV === "development" && err instanceof Error ? err.message : "Verification failed" },
-      { status: 500 }
-    );
+    const isDuplicate = err && typeof err === "object" && "code" in err && (err as { code: number }).code === 11000;
+    const msg = isDuplicate
+      ? "Email or username already registered"
+      : process.env.NODE_ENV === "development" && err instanceof Error
+        ? err.message
+        : "Account creation failed. Please try again.";
+    return NextResponse.json({ error: msg }, { status: isDuplicate ? 400 : 500 });
   }
 }

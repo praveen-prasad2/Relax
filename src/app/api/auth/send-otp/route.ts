@@ -19,7 +19,12 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       const msg = parsed.error.issues[0]?.message ?? "Invalid input";

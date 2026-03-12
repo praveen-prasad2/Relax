@@ -16,12 +16,15 @@ declare global {
 }
 
 const cached = globalThis.mongoose ?? { conn: null, promise: null };
-if (process.env.NODE_ENV !== "production") globalThis.mongoose = cached;
+globalThis.mongoose = cached;
 
 export async function connectDB(): Promise<typeof mongoose> {
   if (cached.conn) return cached.conn;
   if (!cached.promise) {
-    cached.promise = mongoose.connect(getMongoUri());
+    cached.promise = mongoose.connect(getMongoUri(), {
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+    });
   }
   cached.conn = await cached.promise;
   return cached.conn;
