@@ -6,7 +6,10 @@ import { z } from "zod";
 
 const schema = z.object({
   email: z.string().email(),
-  otp: z.string().length(6),
+  otp: z
+    .union([z.string(), z.number()])
+    .transform((v) => String(v).replace(/\D/g, "").slice(0, 6))
+    .refine((s) => s.length === 6, "OTP must be 6 digits"),
 });
 
 export async function POST(req: NextRequest) {
@@ -19,7 +22,8 @@ export async function POST(req: NextRequest) {
     }
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      const msg = parsed.error.issues[0]?.message ?? "Invalid input";
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
     const { email, otp } = parsed.data;
     const emailLower = email.toLowerCase().trim();
