@@ -22,29 +22,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
     const { email, otp } = parsed.data;
+    const emailLower = email.toLowerCase().trim();
     await connectDB();
-    const record = await Otp.findOne({ email }).lean();
+    const record = await Otp.findOne({ email: emailLower }).lean();
     if (!record) return NextResponse.json({ error: "OTP expired or invalid" }, { status: 400 });
     if (String(record.otp).trim() !== String(otp).trim()) return NextResponse.json({ error: "Invalid OTP" }, { status: 400 });
     if (new Date() > record.expiresAt) {
-      await Otp.deleteOne({ email });
+      await Otp.deleteOne({ email: emailLower });
       return NextResponse.json({ error: "OTP expired" }, { status: 400 });
     }
     if (!record.username || !record.passwordHash) {
       return NextResponse.json({ error: "Invalid signup data" }, { status: 400 });
     }
-    const existingUser = await User.findOne({ $or: [{ email: record.email }, { username: record.username }] });
-    if (existingUser) {
-      await Otp.deleteOne({ email });
-      return NextResponse.json({ error: "Email or username already registered" }, { status: 400 });
+    const usernameTrim = String(record.username).trim();
+    const existingByEmail = await User.findOne({ email: emailLower }).lean();
+    const existingByUsername = await User.findOne({ username: usernameTrim }).lean();
+    if (existingByEmail) {
+      await Otp.deleteOne({ email: emailLower });
+      return NextResponse.json({ error: "This email is already registered" }, { status: 400 });
+    }
+    if (existingByUsername) {
+      await Otp.deleteOne({ email: emailLower });
+      return NextResponse.json({ error: "This username is already taken" }, { status: 400 });
     }
     await User.create({
-      email: record.email,
-      username: record.username,
+      email: emailLower,
+      username: usernameTrim,
       password: record.passwordHash,
-      name: record.username,
+      name: usernameTrim,
     });
-    await Otp.deleteOne({ email });
+    await Otp.deleteOne({ email: emailLower });
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Verify OTP error:", err);

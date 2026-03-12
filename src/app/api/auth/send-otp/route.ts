@@ -31,16 +31,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
     const { email, username, password } = parsed.data;
+    const emailLower = email.toLowerCase().trim();
     await connectDB();
-    const existingEmail = await User.findOne({ email });
+    const existingEmail = await User.findOne({ email: emailLower });
     if (existingEmail) return NextResponse.json({ error: "Email already registered" }, { status: 400 });
-    const existingUsername = await User.findOne({ username });
+    const existingUsername = await User.findOne({ username: username.trim() });
     if (existingUsername) return NextResponse.json({ error: "Username already taken" }, { status: 400 });
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const passwordHash = await bcrypt.hash(password, 10);
-    await Otp.deleteMany({ email });
-    await Otp.create({ email, otp, expiresAt, username, passwordHash });
+    await Otp.deleteMany({ email: emailLower });
+    await Otp.create({ email: emailLower, otp, expiresAt, username: username.trim(), passwordHash });
     await sendOtp(email, otp);
     return NextResponse.json({ success: true });
   } catch (err) {
