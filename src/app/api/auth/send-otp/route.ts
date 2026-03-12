@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
-      const msg = parsed.error.errors[0]?.message ?? "Invalid input";
+      const msg = parsed.error.issues[0]?.message ?? "Invalid input";
       return NextResponse.json({ error: msg }, { status: 400 });
     }
     const { email, username, password } = parsed.data;
