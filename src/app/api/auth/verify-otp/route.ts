@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       await Otp.deleteOne({ email: emailLower });
       return NextResponse.json({ error: "This username is already taken" }, { status: 400 });
     }
+    // User created only after successful OTP verification — all user data stored in MongoDB
     await User.create({
       email: emailLower,
       username: usernameTrim,

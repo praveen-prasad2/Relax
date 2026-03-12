@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 10);
     await Otp.deleteMany({ email: emailLower });
     await Otp.create({ email: emailLower, otp, expiresAt, username: username.trim(), passwordHash });
+    // User is NOT created here — only after successful OTP verification in verify-otp
     await sendOtp(email, otp);
     return NextResponse.json({ success: true });
   } catch (err) {
