@@ -53,7 +53,7 @@ export function calculateDifferenceMinutes(
   isHoliday: boolean,
   isLeave: string
 ): number {
-  if (isHoliday || isLeave === "Leave") return 0;
+  if (isHoliday || isLeave === "Leave" || isLeave === "WFH") return 0;
   return workingMinutes - REQUIRED_MINUTES_PER_DAY;
 }
 

@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     const punchIn = existing?.punchIn ? new Date(existing.punchIn) : null;
     const punchOut = existing?.punchOut ? new Date(existing.punchOut) : null;
     const workingMinutes =
-      holiday || existing?.isLeave === "Leave"
+      holiday || existing?.isLeave === "Leave" || existing?.isLeave === "WFH"
         ? 0
         : calculateWorkingMinutes(punchIn, punchOut);
     const diff = calculateDifferenceMinutes(
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
   const punchIn = parsed.data.punchIn ? new Date(parsed.data.punchIn) : null;
   const punchOut = parsed.data.punchOut ? new Date(parsed.data.punchOut) : null;
   const workingMinutes =
-    holiday || parsed.data.isLeave === "Leave"
+    holiday || parsed.data.isLeave === "Leave" || parsed.data.isLeave === "WFH"
       ? 0
       : calculateWorkingMinutes(punchIn, punchOut);
   const differenceMinutes = calculateDifferenceMinutes(
