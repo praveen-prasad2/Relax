@@ -7,10 +7,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { HiOutlinePencilSquare, HiOutlineArrowRightOnRectangle } from "react-icons/hi2";
+import { useSnackbar } from "@/components/Snackbar";
 
 export default function ProfilePage() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
+  const { showSnackbar } = useSnackbar();
   const [editingName, setEditingName] = useState(false);
   const [customName, setCustomName] = useState("");
 
@@ -29,7 +31,9 @@ export default function ProfilePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       setEditingName(false);
+      showSnackbar("Profile updated", "success");
     },
+    onError: () => showSnackbar("Failed to update profile", "error"),
   });
 
   const displayName = profile?.displayName ?? profile?.name ?? (session?.user as { name?: string })?.name ?? "User";

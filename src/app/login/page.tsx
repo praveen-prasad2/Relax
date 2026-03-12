@@ -1,21 +1,28 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { HiOutlineEye, HiOutlineEyeSlash } from "react-icons/hi2";
+import { useSnackbar } from "@/components/Snackbar";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const registered = searchParams.get("registered") === "1";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { showSnackbar } = useSnackbar();
+
+  useEffect(() => {
+    if (registered) showSnackbar("Account created. Sign in to continue.", "success");
+  }, [registered, showSnackbar]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,9 +35,12 @@ function LoginForm() {
     });
     setLoading(false);
     if (res?.error) {
-      setError("Invalid email or password");
+      const msg = "Invalid email or password";
+      setError(msg);
+      showSnackbar(msg, "error");
       return;
     }
+    showSnackbar("Signed in successfully", "success");
     router.push(callbackUrl);
   };
 

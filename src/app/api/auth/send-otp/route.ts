@@ -6,10 +6,15 @@ import Otp from "@/models/Otp";
 import { sendOtp } from "@/lib/email";
 import { z } from "zod";
 
+const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).*$/;
 const schema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/),
-  password: z.string().min(6),
+  password: z
+    .string()
+    .min(8)
+    .refine((p) => !p.includes(" "), "Spaces not allowed")
+    .refine((p) => PASSWORD_REGEX.test(p), "Requires 1 uppercase, 1 number, 1 special character"),
 });
 
 export async function POST(req: NextRequest) {
@@ -17,7 +22,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
+      const msg = parsed.error.errors[0]?.message ?? "Invalid input";
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
     const { email, username, password } = parsed.data;
     await connectDB();

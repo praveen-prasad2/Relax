@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { HiOutlineEye, HiOutlineEyeSlash } from "react-icons/hi2";
+import { useSnackbar } from "@/components/Snackbar";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function SignupPage() {
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { showSnackbar } = useSnackbar();
 
   const parseJson = async (res: Response): Promise<{ error?: string; success?: boolean }> => {
     const text = await res.text();
@@ -27,9 +29,23 @@ export default function SignupPage() {
     }
   };
 
+  const validatePassword = (p: string) => {
+    if (p.includes(" ")) return "Spaces not allowed";
+    if (p.length < 8) return "Min 8 characters";
+    if (!/[A-Z]/.test(p)) return "1 uppercase required";
+    if (!/\d/.test(p)) return "1 number required";
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(p)) return "1 special character required";
+    return "";
+  };
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const pwErr = validatePassword(password);
+    if (pwErr) {
+      setError(pwErr);
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/send-otp", {
@@ -39,12 +55,17 @@ export default function SignupPage() {
       });
       const data = await parseJson(res);
       if (!res.ok) {
-        setError(data.error || "Failed to send OTP");
+        const msg = data.error || "Failed to send OTP";
+        setError(msg);
+        showSnackbar(msg, "error");
         return;
       }
+      showSnackbar("OTP sent to your email", "success");
       setStep("otp");
     } catch (err) {
-      setError("Network error. Please try again.");
+      const msg = "Network error. Please try again.";
+      setError(msg);
+      showSnackbar(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -62,12 +83,17 @@ export default function SignupPage() {
       });
       const data = await parseJson(res);
       if (!res.ok) {
-        setError(data.error || "Verification failed");
+        const msg = data.error || "Verification failed";
+        setError(msg);
+        showSnackbar(msg, "error");
         return;
       }
+      showSnackbar("Account created successfully", "success");
       router.push("/login?registered=1");
     } catch (err) {
-      setError("Network error. Please try again.");
+      const msg = "Network error. Please try again.";
+      setError(msg);
+      showSnackbar(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -119,9 +145,9 @@ export default function SignupPage() {
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => setPassword(e.target.value.replace(/\s/g, ""))}
                   required
-                  minLength={6}
+                  minLength={8}
                   className="w-full rounded-xl border border-[#E5E7EB] px-4 py-3 pr-12 text-[#111827]"
                 />
                 <button
@@ -133,7 +159,7 @@ export default function SignupPage() {
                 {showPassword ? <HiOutlineEyeSlash className="h-5 w-5" /> : <HiOutlineEye className="h-5 w-5" />}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-[#6B7280]">Min 6 characters</p>
+              <p className="mt-1 text-xs text-[#6B7280]">1 uppercase, 1 number, 1 special char. No spaces. Min 8 chars</p>
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button

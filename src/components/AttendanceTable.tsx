@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { HiOutlinePencilSquare } from "react-icons/hi2";
 import { formatMinutesToDisplay, formatDateDDMMYYYY, formatWorkingTime } from "@/lib/attendance-calculator";
+import { useSnackbar } from "@/components/Snackbar";
 
 type FilterType = "all" | "leave" | "holiday" | "wfh" | "worked";
 
@@ -31,6 +32,7 @@ export function AttendanceTable({
   month: number;
 }) {
   const queryClient = useQueryClient();
+  const { showSnackbar } = useSnackbar();
   const todayStr = (() => {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
@@ -59,7 +61,9 @@ export function AttendanceTable({
       queryClient.invalidateQueries({ queryKey: ["attendance", year, month] });
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       setEditingRow(null);
+      showSnackbar("Attendance saved", "success");
     },
+    onError: () => showSnackbar("Failed to save", "error"),
   });
 
   const parseTimeFromISO = (iso: string | null) => {

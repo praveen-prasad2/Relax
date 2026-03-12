@@ -20,13 +20,18 @@ export async function POST(req: NextRequest) {
     await connectDB();
     const record = await Otp.findOne({ email });
     if (!record) return NextResponse.json({ error: "OTP expired or invalid" }, { status: 400 });
-    if (record.otp !== otp) return NextResponse.json({ error: "Invalid OTP" }, { status: 400 });
+    if (String(record.otp).trim() !== String(otp).trim()) return NextResponse.json({ error: "Invalid OTP" }, { status: 400 });
     if (new Date() > record.expiresAt) {
       await Otp.deleteOne({ email });
       return NextResponse.json({ error: "OTP expired" }, { status: 400 });
     }
     if (!record.username || !record.passwordHash) {
       return NextResponse.json({ error: "Invalid signup data" }, { status: 400 });
+    }
+    const existingUser = await User.findOne({ $or: [{ email: record.email }, { username: record.username }] });
+    if (existingUser) {
+      await Otp.deleteOne({ email });
+      return NextResponse.json({ error: "Email or username already registered" }, { status: 400 });
     }
     await User.create({
       email: record.email,
