@@ -53,7 +53,7 @@ export default function ProfilePage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-xl font-semibold text-[#111827]">Profile</h1>
+        <h1 className="text-xl font-semibold text-[#000000]">Profile</h1>
         <p className="mt-1 text-sm text-[#6B7280]">Manage your account</p>
       </motion.div>
 
@@ -73,7 +73,7 @@ export default function ProfilePage() {
               className="rounded-full"
             />
           ) : (
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#EEF2FF] text-2xl font-semibold text-[#4F46E5]">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FDE8EA] text-2xl font-semibold text-[#cc161c]">
               {displayName.charAt(0).toUpperCase()}
             </div>
           )}
@@ -90,7 +90,7 @@ export default function ProfilePage() {
                 <button
                   onClick={saveName}
                   disabled={updateMutation.isPending}
-                  className="flex-1 rounded-xl bg-[#4F46E5] py-2.5 text-white font-medium"
+                  className="flex-1 rounded-xl bg-[#cc161c] py-2.5 text-white font-medium hover:bg-[#a81218]"
                 >
                   Save
                 </button>
@@ -104,10 +104,10 @@ export default function ProfilePage() {
             </div>
           ) : (
             <>
-              <span className="text-lg font-semibold text-[#111827]">{displayName}</span>
+              <span className="text-lg font-semibold text-[#000000]">{displayName}</span>
               <button
                 onClick={startEdit}
-                className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] px-4 py-2 text-sm text-[#4F46E5]"
+                className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] px-4 py-2 text-sm text-[#cc161c]"
               >
                 <HiOutlinePencilSquare className="h-4 w-4" />
                 Edit name

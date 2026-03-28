@@ -100,7 +100,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#F9FAFB] px-6">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -108,7 +108,9 @@ export default function SignupPage() {
         className="w-full max-w-sm space-y-6"
       >
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-[#111827]">Relax</h1>
+          <h1 className="text-3xl font-bold text-[#000000]">
+            TimeForge <span className="text-lg font-normal text-[#6B7280]">by Praveen</span>
+          </h1>
           <p className="mt-2 text-[#6B7280]">Create your account</p>
         </div>
         {step === "form" ? (
@@ -120,7 +122,7 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full rounded-xl border border-[#E5E7EB] px-4 py-3 text-[#111827]"
+                className="w-full rounded-xl border border-[#E5E7EB] px-4 py-3 text-[#000000]"
                 placeholder="you@example.com"
               />
             </div>
@@ -134,7 +136,7 @@ export default function SignupPage() {
                 minLength={3}
                 maxLength={30}
                 pattern="[a-zA-Z0-9_]+"
-                className="w-full rounded-xl border border-[#E5E7EB] px-4 py-3 text-[#111827]"
+                className="w-full rounded-xl border border-[#E5E7EB] px-4 py-3 text-[#000000]"
                 placeholder="johndoe"
               />
               <p className="mt-1 text-xs text-[#6B7280]">Letters, numbers, underscores only</p>
@@ -148,12 +150,12 @@ export default function SignupPage() {
                   onChange={(e) => setPassword(e.target.value.replace(/\s/g, ""))}
                   required
                   minLength={8}
-                  className="w-full rounded-xl border border-[#E5E7EB] px-4 py-3 pr-12 text-[#111827]"
+                  className="w-full rounded-xl border border-[#E5E7EB] px-4 py-3 pr-12 text-[#000000]"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((p) => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#111827]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#000000]"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                 {showPassword ? <HiOutlineEyeSlash className="h-5 w-5" /> : <HiOutlineEye className="h-5 w-5" />}
@@ -165,7 +167,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-[#4F46E5] py-3.5 px-4 text-white font-medium hover:bg-[#4338CA] disabled:opacity-50"
+              className="w-full rounded-xl bg-[#cc161c] py-3.5 px-4 text-white font-medium hover:bg-[#a81218] disabled:opacity-50"
             >
               {loading ? "Sending OTP..." : "Send verification code"}
             </button>
@@ -183,7 +185,7 @@ export default function SignupPage() {
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 required
                 maxLength={6}
-                className="w-full rounded-xl border border-[#E5E7EB] px-4 py-3 text-[#111827] text-center text-lg tracking-widest"
+                className="w-full rounded-xl border border-[#E5E7EB] px-4 py-3 text-[#000000] text-center text-lg tracking-widest"
                 placeholder="000000"
               />
             </div>
@@ -191,7 +193,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-[#4F46E5] py-3.5 px-4 text-white font-medium hover:bg-[#4338CA] disabled:opacity-50"
+              className="w-full rounded-xl bg-[#cc161c] py-3.5 px-4 text-white font-medium hover:bg-[#a81218] disabled:opacity-50"
             >
               {loading ? "Verifying..." : "Verify & create account"}
             </button>
@@ -206,7 +208,7 @@ export default function SignupPage() {
         )}
         <p className="text-center text-sm text-[#6B7280]">
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-[#4F46E5]">
+          <Link href="/login" className="font-medium text-[#cc161c]">
             Sign in
           </Link>
         </p>

@@ -1,46 +1,63 @@
 const REQUIRED_MINUTES_PER_DAY = 9 * 60;
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+/** IST: punch-in at or after 10:30 (minutes from midnight). */
+const HALF_DAY_IN_FROM = 10 * 60 + 30;
+/** IST: punch-out at or before 16:30 (minutes from midnight). */
+const HALF_DAY_OUT_UNTIL = 16 * 60 + 30;
+
+/** Calendar + attendance cycle use India timezone (matches typical deployment / users). */
+export const ATTENDANCE_TZ = "Asia/Kolkata";
+
+/** YYYY-MM-DD in ATTENDANCE_TZ (works in browser + Node). */
+export function toDateKey(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: ATTENDANCE_TZ }).format(date);
+}
+
+/** Start of that calendar day in IST as a UTC instant (stable in MongoDB). */
+export function parseDateKeyToDate(dateKey: string): Date {
+  return new Date(`${dateKey}T00:00:00+05:30`);
+}
 
 export function getAttendanceMonthBounds(year: number, month: number): { start: Date; end: Date } {
-  const start = new Date(year, month - 2, 24);
-  const end = new Date(year, month - 1, 23);
+  const start = new Date(Date.UTC(year, month - 2, 24));
+  const end = new Date(Date.UTC(year, month - 1, 23));
   return { start, end };
 }
 
 export function getAttendanceMonthFromDate(date: Date): { year: number; month: number } {
-  const d = new Date(date);
-  const day = d.getDate();
-  if (day >= 24) {
-    const next = new Date(d.getFullYear(), d.getMonth() + 1);
-    return { year: next.getFullYear(), month: next.getMonth() + 1 };
+  const key = toDateKey(date);
+  const [y, m, d] = key.split("-").map(Number);
+  if (d >= 24) {
+    const nextM = m === 12 ? 1 : m + 1;
+    const nextY = m === 12 ? y + 1 : y;
+    return { year: nextY, month: nextM };
   }
-  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  return { year: y, month: m };
 }
 
-export function generateMonthDates(year: number, month: number): Date[] {
+export function generateMonthDateKeys(year: number, month: number): string[] {
   const { start, end } = getAttendanceMonthBounds(year, month);
-  const dates: Date[] = [];
-  const current = new Date(start);
-  while (current <= end) {
-    dates.push(new Date(current));
-    current.setDate(current.getDate() + 1);
+  const keys: string[] = [];
+  let cur = new Date(start.getTime());
+  while (cur <= end) {
+    keys.push(toDateKey(cur));
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
-  return dates;
+  return keys;
 }
 
-export function toDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+/** @deprecated Prefer generateMonthDateKeys + parseDateKeyToDate */
+export function generateMonthDates(year: number, month: number): Date[] {
+  return generateMonthDateKeys(year, month).map((k) => parseDateKeyToDate(k));
 }
 
 export function getDayName(date: Date): string {
-  return DAY_NAMES[date.getDay()];
+  return new Intl.DateTimeFormat("en-US", { timeZone: ATTENDANCE_TZ, weekday: "long" }).format(date);
 }
 
 export function isSunday(date: Date): boolean {
-  return date.getDay() === 0;
+  return (
+    new Intl.DateTimeFormat("en-US", { timeZone: ATTENDANCE_TZ, weekday: "short" }).format(date) === "Sun"
+  );
 }
 
 export function calculateWorkingMinutes(punchIn: Date | null, punchOut: Date | null): number {
@@ -48,13 +65,44 @@ export function calculateWorkingMinutes(punchIn: Date | null, punchOut: Date | n
   return Math.max(0, Math.floor((punchOut.getTime() - punchIn.getTime()) / 60000));
 }
 
+/** Minutes from midnight in ATTENDANCE_TZ (uses sv-SE + tz for reliable parsing vs formatToParts). */
+export function getMinutesSinceMidnightIST(date: Date): number {
+  const s = date.toLocaleString("sv-SE", { timeZone: ATTENDANCE_TZ });
+  const timePart = s.split(" ")[1];
+  if (!timePart) return 0;
+  const [h, m] = timePart.split(":").map((x) => parseInt(x, 10));
+  if (Number.isNaN(h) || Number.isNaN(m)) return 0;
+  return h * 60 + m;
+}
+
+/**
+ * Late in (≥10:30 IST) and early out (≤16:30 IST), same IST calendar day.
+ * Not counted on holiday / leave / WFH.
+ */
+export function detectHalfDay(
+  punchIn: Date | null,
+  punchOut: Date | null,
+  isHoliday: boolean,
+  isLeave: string
+): boolean {
+  if (isHoliday || isLeave === "Leave" || isLeave === "WFH") return false;
+  if (!punchIn || !punchOut) return false;
+  if (punchOut.getTime() <= punchIn.getTime()) return false;
+  if (toDateKey(punchIn) !== toDateKey(punchOut)) return false;
+  const inM = getMinutesSinceMidnightIST(punchIn);
+  const outM = getMinutesSinceMidnightIST(punchOut);
+  return inM >= HALF_DAY_IN_FROM && outM <= HALF_DAY_OUT_UNTIL;
+}
+
 export function calculateDifferenceMinutes(
   workingMinutes: number,
   isHoliday: boolean,
-  isLeave: string
+  isLeave: string,
+  isHalfDay = false
 ): number {
   if (isHoliday || isLeave === "Leave" || isLeave === "WFH") return 0;
-  return workingMinutes - REQUIRED_MINUTES_PER_DAY;
+  const required = isHalfDay ? REQUIRED_MINUTES_PER_DAY / 2 : REQUIRED_MINUTES_PER_DAY;
+  return workingMinutes - required;
 }
 
 export function formatDateDDMMYYYY(dateStr: string): string {
@@ -77,4 +125,103 @@ export function formatWorkingTime(minutes: number): string {
   const m = minutes % 60;
   if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
   return `${m}m`;
+}
+
+/** `dateKey` + HTML time value → ISO string anchored in IST (stable for Mongo + display). */
+export function buildAttendanceDateTimeISO(dateKey: string, timeHHmm: string): string {
+  const trimmed = timeHHmm.trim();
+  const [hRaw, mRaw] = trimmed.split(":");
+  const h = (hRaw ?? "0").padStart(2, "0");
+  const m = (mRaw ?? "0").padStart(2, "0");
+  return `${dateKey}T${h}:${m}:00+05:30`;
+}
+
+/** Format stored instant as HH:mm in ATTENDANCE_TZ (what the user expects to see). */
+export function formatClockTimeIST(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: ATTENDANCE_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const h = parts.find((p) => p.type === "hour")?.value ?? "00";
+  const m = parts.find((p) => p.type === "minute")?.value ?? "00";
+  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
+}
+
+export function clockTimeToInputValue(iso: string | null | undefined): string {
+  return formatClockTimeIST(iso);
+}
+
+export type AttendanceRecordLean = {
+  _id?: unknown;
+  punchIn?: Date | string | null;
+  punchOut?: Date | string | null;
+  isLeave?: string;
+  isHoliday?: boolean;
+};
+
+export type AttendanceRowComputed = {
+  _id?: unknown;
+  date: string;
+  dayName: string;
+  punchIn: string | null;
+  punchOut: string | null;
+  isLeave: string;
+  isHoliday: boolean;
+  isHalfDay: boolean;
+  workingMinutes: number;
+  differenceMinutes: number;
+  totalDifferenceMinutes: number;
+};
+
+export function buildAttendanceRows(
+  dateKeys: string[],
+  recordByKey: Map<string, AttendanceRecordLean | undefined>,
+  todayStr: string
+): AttendanceRowComputed[] {
+  let runningDiff = 0;
+  return dateKeys.map((key) => {
+    const date = parseDateKeyToDate(key);
+    const existing = recordByKey.get(key);
+    const dayName = getDayName(date);
+    const holiday = existing?.isHoliday ?? isSunday(date);
+    const leave = existing?.isLeave ?? "None";
+    const punchIn = existing?.punchIn ? new Date(existing.punchIn as string | Date) : null;
+    const punchOut = existing?.punchOut ? new Date(existing.punchOut as string | Date) : null;
+    const workingMinutes =
+      holiday || leave === "Leave" || leave === "WFH"
+        ? 0
+        : calculateWorkingMinutes(punchIn, punchOut);
+    const isHalfDay = detectHalfDay(punchIn, punchOut, holiday, leave);
+    const diff = calculateDifferenceMinutes(workingMinutes, holiday, leave, isHalfDay);
+    const isTodayNoOut = key === todayStr && !punchOut;
+    const isFuture = key > todayStr;
+    if (!isFuture && !isTodayNoOut) runningDiff += diff;
+    return {
+      _id: existing?._id,
+      date: key,
+      dayName,
+      punchIn: punchIn?.toISOString() ?? null,
+      punchOut: punchOut?.toISOString() ?? null,
+      isLeave: leave,
+      isHoliday: holiday,
+      isHalfDay,
+      workingMinutes,
+      differenceMinutes: diff,
+      totalDifferenceMinutes: runningDiff,
+    };
+  });
+}
+
+export function summarizeCycleStats(rows: Pick<AttendanceRowComputed, "isLeave" | "isHoliday" | "isHalfDay">[]) {
+  return {
+    leaves: rows.filter((r) => r.isLeave === "Leave").length,
+    halfDays: rows.filter((r) => r.isHalfDay).length,
+    wfh: rows.filter((r) => r.isLeave === "WFH").length,
+    holidays: rows.filter((r) => r.isHoliday).length,
+  };
 }

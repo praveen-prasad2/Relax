@@ -11,9 +11,6 @@ import { HiOutlineArrowLeft } from "react-icons/hi2";
 const titles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/attendance": "Attendance",
-  "/tables": "Workspace",
-  "/tables/": "Folder",
-  "/search": "Search",
   "/profile": "Profile",
 };
 
@@ -30,10 +27,7 @@ export function Header({ title: titleProp, showBack, backHref }: HeaderProps) {
     queryKey: ["profile"],
     queryFn: () => fetch("/api/users/profile").then((r) => r.json()),
   });
-  const title =
-    titleProp ??
-    (pathname.startsWith("/tables/") ? "Folder" : titles[pathname]) ??
-    "Relax";
+  const title = titleProp ?? titles[pathname] ?? "TimeForge by Praveen";
   const displayName = profile?.displayName ?? (session?.user as { name?: string })?.name ?? "User";
 
   return (
@@ -48,7 +42,7 @@ export function Header({ title: titleProp, showBack, backHref }: HeaderProps) {
             <HiOutlineArrowLeft className="h-5 w-5" />
           </Link>
         )}
-        {title && <span className="text-lg font-semibold text-[#111827]">{title}</span>}
+        {title && <span className="text-lg font-semibold text-[#000000]">{title}</span>}
       </div>
       <div className="flex items-center gap-2">
         {(() => {
@@ -56,7 +50,7 @@ export function Header({ title: titleProp, showBack, backHref }: HeaderProps) {
           return img ? (
             <Image src={img} alt="" width={32} height={32} className="rounded-full" />
           ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EEF2FF] text-sm font-medium text-[#4F46E5]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FDE8EA] text-sm font-medium text-[#cc161c]">
               {displayName.charAt(0).toUpperCase()}
             </div>
           );

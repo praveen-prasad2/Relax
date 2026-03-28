@@ -3,19 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import {
-  HiOutlineHome,
-  HiOutlineCalendarDays,
-  HiOutlineTableCells,
-  HiOutlineMagnifyingGlass,
-  HiOutlineUser,
-} from "react-icons/hi2";
+import { HiOutlineHome, HiOutlineCalendarDays, HiOutlineUser } from "react-icons/hi2";
 
 const navItems = [
   { href: "/dashboard", label: "Home", Icon: HiOutlineHome },
   { href: "/attendance", label: "Attendance", Icon: HiOutlineCalendarDays },
-  { href: "/tables", label: "Tables", Icon: HiOutlineTableCells },
-  { href: "/search", label: "Search", Icon: HiOutlineMagnifyingGlass },
   { href: "/profile", label: "Profile", Icon: HiOutlineUser },
 ];
 
@@ -35,12 +27,12 @@ export function BottomNavbar() {
             >
               {active ? (
                 <motion.div layoutId="nav-indicator" className="rounded-full p-1" transition={{ type: "spring", stiffness: 300, damping: 30 }}>
-                  <Icon className="h-6 w-6 text-[#4F46E5]" />
+                  <Icon className="h-6 w-6 text-[#cc161c]" />
                 </motion.div>
               ) : (
-                <Icon className="h-6 w-6 text-[#9CA3AF]" />
+                <Icon className="h-6 w-6 text-[#737373]" />
               )}
-              <span className={`text-xs ${active ? "text-[#4F46E5] font-medium" : "text-[#9CA3AF]"}`}>{label}</span>
+              <span className={`text-xs ${active ? "text-[#cc161c] font-medium" : "text-[#737373]"}`}>{label}</span>
             </Link>
           );
         })}

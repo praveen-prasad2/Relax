@@ -1,6 +1,6 @@
-# Relax - Personal Productivity
+# TimeForge by Praveen
 
-A mobile-first personal productivity app with Attendance Calculator, Folder-based Tables & Notes, and Global Search.
+Mobile-first attendance tracking: 24th–23rd month cycle, Mon–Sat work days, 9h/day, Sunday = holiday.
 
 ## Tech Stack
 
@@ -11,11 +11,7 @@ A mobile-first personal productivity app with Attendance Calculator, Folder-base
 ## Features
 
 - **Email + Password** login with OTP-verified signup
-- **Attendance Calculator**: 24th–23rd month cycle, Mon–Sat work days, 9h/day, Sunday = holiday
-- **Folder Workspace**: Organize Tables and Notes in folders
-- **Table Editor**: Custom columns, rows, cell editing
-- **Notes Editor**: Markdown support, autosave
-- **Global Search**: Folders, tables, notes, attendance
+- **Attendance**: Month view, punch in/out, leave/WFH/holiday, daily and cumulative difference
 
 ## Setup
 

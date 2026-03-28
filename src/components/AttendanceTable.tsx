@@ -4,10 +4,18 @@ import { useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { HiOutlinePencilSquare } from "react-icons/hi2";
-import { formatMinutesToDisplay, formatDateDDMMYYYY, formatWorkingTime } from "@/lib/attendance-calculator";
+import {
+  formatMinutesToDisplay,
+  formatDateDDMMYYYY,
+  formatWorkingTime,
+  toDateKey,
+  formatClockTimeIST,
+  clockTimeToInputValue,
+  buildAttendanceDateTimeISO,
+} from "@/lib/attendance-calculator";
 import { useSnackbar } from "@/components/Snackbar";
 
-type FilterType = "all" | "leave" | "holiday" | "wfh" | "worked";
+type FilterType = "all" | "leave" | "holiday" | "wfh" | "halfday" | "worked";
 
 interface Row {
   _id?: string;
@@ -17,6 +25,7 @@ interface Row {
   punchOut: string | null;
   isLeave: string;
   isHoliday: boolean;
+  isHalfDay?: boolean;
   workingMinutes: number;
   differenceMinutes: number;
   totalDifferenceMinutes: number;
@@ -33,10 +42,7 @@ export function AttendanceTable({
 }) {
   const queryClient = useQueryClient();
   const { showSnackbar } = useSnackbar();
-  const todayStr = (() => {
-    const n = new Date();
-    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-  })();
+  const todayStr = toDateKey(new Date());
   const [filter, setFilter] = useState<FilterType>("all");
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Row>>({});
@@ -46,7 +52,15 @@ export function AttendanceTable({
     if (filter === "leave") return rows.filter((r) => r.isLeave === "Leave");
     if (filter === "holiday") return rows.filter((r) => r.isHoliday);
     if (filter === "wfh") return rows.filter((r) => r.isLeave === "WFH");
-    if (filter === "worked") return rows.filter((r) => r.isLeave !== "Leave" && r.isLeave !== "WFH" && !r.isHoliday);
+    if (filter === "halfday") return rows.filter((r) => r.isHalfDay);
+    if (filter === "worked")
+      return rows.filter(
+        (r) =>
+          r.isLeave !== "Leave" &&
+          r.isLeave !== "WFH" &&
+          !r.isHoliday &&
+          !r.isHalfDay
+      );
     return rows;
   }, [rows, filter]);
 
@@ -66,14 +80,8 @@ export function AttendanceTable({
     onError: () => showSnackbar("Failed to save", "error"),
   });
 
-  const parseTimeFromISO = (iso: string | null) => {
-    if (!iso) return null;
-    const m = iso.match(/T(\d{2}):(\d{2})/);
-    return m ? `${m[1]}:${m[2]}` : null;
-  };
-
-  const formatTimeAsEntered = (iso: string | null) => parseTimeFromISO(iso) ?? "-";
-  const timeToInput = (iso: string | null) => parseTimeFromISO(iso) ?? "";
+  const formatTimeAsEntered = (iso: string | null) => formatClockTimeIST(iso) || "-";
+  const timeToInput = (iso: string | null) => clockTimeToInputValue(iso);
 
   const startEdit = (row: Row) => {
     setEditingRow(row.date);
@@ -91,13 +99,14 @@ export function AttendanceTable({
     });
   };
 
-  const headerLabels = ["Date", "Day", "In", "Out", "Leave/WFH", "Holiday", "Worked", "Daily Diff", "Total Diff", "Actions"];
+  const headerLabels = ["Date", "Day", "In", "Out", "Status", "Holiday", "Worked", "Daily Diff", "Total Diff", "Actions"];
 
   const filterButtons: { key: FilterType; label: string; className: string }[] = [
-    { key: "all", label: "All", className: filter === "all" ? "bg-[#4F46E5] text-white" : "bg-white text-[#6B7280] border border-[#E5E7EB]" },
+    { key: "all", label: "All", className: filter === "all" ? "bg-[#cc161c] text-white" : "bg-white text-[#6B7280] border border-[#E5E7EB]" },
     { key: "leave", label: "Leave", className: filter === "leave" ? "bg-orange-500 text-white" : "bg-orange-100 text-orange-700 border border-orange-200" },
     { key: "holiday", label: "Holiday", className: filter === "holiday" ? "bg-amber-500 text-white" : "bg-amber-100 text-amber-700 border border-amber-200" },
-    { key: "wfh", label: "WFH", className: filter === "wfh" ? "bg-blue-500 text-white" : "bg-blue-100 text-blue-700 border border-blue-200" },
+    { key: "wfh", label: "WFH", className: filter === "wfh" ? "bg-[#cc161c] text-white" : "bg-white text-[#6B7280] border border-[#E5E7EB]" },
+    { key: "halfday", label: "Half day", className: filter === "halfday" ? "bg-sky-600 text-white" : "bg-sky-50 text-sky-800 border border-sky-200" },
     { key: "worked", label: "Worked", className: filter === "worked" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-200" },
   ];
 
@@ -127,6 +136,7 @@ export function AttendanceTable({
           const isFuture = row.date > todayStr;
           const canEdit = !isFuture;
           const isEditing = editingRow === row.date;
+          const isHolidayRow = isEditing ? (form.isHoliday ?? row.isHoliday) : row.isHoliday;
 
           return (
             <motion.div
@@ -135,27 +145,41 @@ export function AttendanceTable({
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.02 }}
               className={`rounded-xl border overflow-hidden ${
-                isToday ? "border-[#4F46E5] bg-[#EEF2FF]/50" : "border-[#E5E7EB] bg-white"
+                isHolidayRow
+                  ? `border-[#d65c62] bg-[#e07377] ${isToday ? "ring-2 ring-[#cc161c] ring-offset-1" : ""}`
+                  : isToday
+                    ? "border-[#cc161c] bg-[#FDE8EA]/50"
+                    : "border-[#E5E7EB] bg-white"
               }`}
             >
               <div className="flex flex-wrap gap-x-2 gap-y-2 p-3 text-sm items-center">
                 {isEditing ? (
                   <div className="flex flex-wrap gap-3 w-full">
                     <div>
-                      <span className="font-medium text-[#111827]">{formatDateDDMMYYYY(row.date)}</span>
+                      <span className="font-medium text-[#000000]">{formatDateDDMMYYYY(row.date)}</span>
                       <span className="ml-1 text-[#6B7280]">{row.dayName}</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <input
                         type="time"
                         value={timeToInput(form.punchIn ?? null)}
-                        onChange={(e) => setForm((f) => ({ ...f, punchIn: e.target.value ? `${row.date}T${e.target.value}:00` : undefined }))}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            punchIn: e.target.value ? buildAttendanceDateTimeISO(row.date, e.target.value) : undefined,
+                          }))
+                        }
                         className="rounded-lg border border-[#E5E7EB] px-2 py-1.5 text-sm"
                       />
                       <input
                         type="time"
                         value={timeToInput(form.punchOut ?? null)}
-                        onChange={(e) => setForm((f) => ({ ...f, punchOut: e.target.value ? `${row.date}T${e.target.value}:00` : undefined }))}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            punchOut: e.target.value ? buildAttendanceDateTimeISO(row.date, e.target.value) : undefined,
+                          }))
+                        }
                         className="rounded-lg border border-[#E5E7EB] px-2 py-1.5 text-sm"
                       />
                       <select
@@ -181,7 +205,7 @@ export function AttendanceTable({
                       <button
                         onClick={save}
                         disabled={mutation.isPending}
-                        className="rounded-lg bg-[#4F46E5] px-3 py-1.5 text-white text-sm font-medium"
+                        className="rounded-lg bg-[#cc161c] px-3 py-1.5 text-white text-sm font-medium hover:bg-[#a81218]"
                       >
                         Save
                       </button>
@@ -193,20 +217,30 @@ export function AttendanceTable({
                 ) : (
                   <>
                     <div className="min-w-[90px]">
-                      <span className="font-medium text-[#111827]">{formatDateDDMMYYYY(row.date)}</span>
-                      {isToday && <span className="ml-1 text-[#4F46E5] text-xs">Today</span>}
+                      <span className="font-medium text-[#000000]">{formatDateDDMMYYYY(row.date)}</span>
+                      {isToday && <span className="ml-1 text-[#cc161c] text-xs">Today</span>}
                     </div>
                     <span className="min-w-[70px] text-[#6B7280]">{row.dayName}</span>
                     <span className="min-w-[55px] text-[#6B7280]">{formatTimeAsEntered(row.punchIn)}</span>
                     <span className="min-w-[55px] text-[#6B7280]">{formatTimeAsEntered(row.punchOut)}</span>
-                    <span className={`min-w-[45px] ${
-                      row.isLeave === "Leave" ? "rounded-md bg-orange-500 px-2 py-0.5 text-sm font-medium text-white" :
-                      row.isLeave === "WFH" ? "rounded-md bg-blue-500 px-2 py-0.5 text-sm font-medium text-white" :
-                      "text-[#6B7280]"
-                    }`}>
-                      {row.isLeave}
+                    <span className="min-w-[56px]">
+                      {row.isLeave === "Leave" ? (
+                        <span className="rounded-md bg-orange-500 px-2 py-0.5 text-xs font-medium text-white">Leave</span>
+                      ) : row.isLeave === "WFH" ? (
+                        <span className="rounded-md bg-[#cc161c] px-2 py-0.5 text-xs font-medium text-white">WFH</span>
+                      ) : row.isHalfDay ? (
+                        <span className="rounded-md bg-sky-600 px-2 py-0.5 text-xs font-medium text-white">Half</span>
+                      ) : (
+                        <span className="text-[#6B7280]">{row.isLeave}</span>
+                      )}
                     </span>
-                    <span className={`min-w-[45px] ${row.isHoliday ? "rounded-md bg-purple-300 px-2 py-0.5 text-sm font-medium text-black " : "text-[#6B7280]"}`}>
+                    <span
+                      className={`min-w-[45px] ${
+                        row.isHoliday
+                          ? "rounded-md bg-white/35 px-2 py-0.5 text-sm font-medium text-[#000000]"
+                          : "text-[#6B7280]"
+                      }`}
+                    >
                       {row.isHoliday ? "Yes" : "-"}
                     </span>
                     <span className="min-w-[60px] text-[#6B7280]">{formatWorkingTime(row.workingMinutes)}</span>
@@ -219,7 +253,7 @@ export function AttendanceTable({
                     {canEdit ? (
                       <button
                         onClick={() => startEdit(row)}
-                        className="min-w-[50px] rounded-lg border border-[#E5E7EB] px-2 py-1 text-xs text-[#4F46E5] flex items-center gap-1"
+                        className="min-w-[50px] rounded-lg border border-[#E5E7EB] px-2 py-1 text-xs text-[#cc161c] flex items-center gap-1"
                       >
                         <HiOutlinePencilSquare className="h-4 w-4" />
                         Edit

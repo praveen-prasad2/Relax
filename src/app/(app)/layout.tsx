@@ -14,7 +14,7 @@ export default async function AppLayout({
   if (!session) redirect("/login");
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-20">
+    <div className="min-h-screen bg-white pb-20">
       <MidnightRefresher />
       <Header />
       <main className="mx-auto w-full max-w-lg md:max-w-none md:px-6">{children}</main>

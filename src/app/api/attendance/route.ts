@@ -5,12 +5,15 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Attendance from "@/models/Attendance";
 import {
-  generateMonthDates,
+  generateMonthDateKeys,
+  parseDateKeyToDate,
+  toDateKey,
   getDayName,
   isSunday,
-  toDateKey,
   calculateWorkingMinutes,
   calculateDifferenceMinutes,
+  buildAttendanceRows,
+  detectHalfDay,
 } from "@/lib/attendance-calculator";
 import { z } from "zod";
 
@@ -32,49 +35,23 @@ export async function GET(req: NextRequest) {
   const year = parseInt(searchParams.get("year") || "");
   const month = parseInt(searchParams.get("month") || "");
   if (isNaN(year) || isNaN(month)) return NextResponse.json({ error: "Invalid year/month" }, { status: 400 });
-  const dates = generateMonthDates(year, month);
-  const records = await Attendance.find({
+  const dateKeys = generateMonthDateKeys(year, month);
+  const keySet = new Set(dateKeys);
+  const rangeStart = new Date(parseDateKeyToDate(dateKeys[0]).getTime() - 86400000);
+  const rangeEnd = new Date(parseDateKeyToDate(dateKeys[dateKeys.length - 1]).getTime() + 86400000 * 2);
+  const raw = await Attendance.find({
     userId: user._id,
-    date: { $in: dates },
+    date: { $gte: rangeStart, $lte: rangeEnd },
   }).lean();
-  const map = new Map(records.map((r) => [toDateKey(new Date(r.date)), r]));
+  const recordByKey = new Map<string, (typeof raw)[0]>();
+  for (const r of raw) {
+    const key = toDateKey(new Date(r.date));
+    if (keySet.has(key)) recordByKey.set(key, r);
+  }
   const todayParam = searchParams.get("today");
   const todayStr =
-    todayParam && /^\d{4}-\d{2}-\d{2}$/.test(todayParam)
-      ? todayParam
-      : toDateKey(new Date());
-  let runningDiff = 0;
-  const rows = dates.map((date) => {
-    const key = toDateKey(date);
-    const existing = map.get(key);
-    const dayName = getDayName(date);
-    const holiday = existing?.isHoliday ?? isSunday(date);
-    const punchIn = existing?.punchIn ? new Date(existing.punchIn) : null;
-    const punchOut = existing?.punchOut ? new Date(existing.punchOut) : null;
-    const workingMinutes =
-      holiday || existing?.isLeave === "Leave" || existing?.isLeave === "WFH"
-        ? 0
-        : calculateWorkingMinutes(punchIn, punchOut);
-    const diff = calculateDifferenceMinutes(
-      workingMinutes,
-      holiday,
-      existing?.isLeave ?? "None"
-    );
-    const isTodayNoOut = key === todayStr && !punchOut;
-    if (!isTodayNoOut) runningDiff += diff;
-    return {
-      _id: existing?._id,
-      date: key,
-      dayName,
-      punchIn: punchIn?.toISOString() ?? null,
-      punchOut: punchOut?.toISOString() ?? null,
-      isLeave: existing?.isLeave ?? "None",
-      isHoliday: holiday,
-      workingMinutes,
-      differenceMinutes: diff,
-      totalDifferenceMinutes: runningDiff,
-    };
-  });
+    todayParam && /^\d{4}-\d{2}-\d{2}$/.test(todayParam) ? todayParam : toDateKey(new Date());
+  const rows = buildAttendanceRows(dateKeys, recordByKey, todayStr);
   return NextResponse.json({ rows });
 }
 
@@ -87,21 +64,18 @@ export async function POST(req: NextRequest) {
   await connectDB();
   const user = await User.findOne({ email: session.user.email });
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
-  const [y, m, d] = parsed.data.date.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
+  const date = parseDateKeyToDate(parsed.data.date);
   const dayName = getDayName(date);
   const holiday = parsed.data.isHoliday ?? isSunday(date);
   const punchIn = parsed.data.punchIn ? new Date(parsed.data.punchIn) : null;
   const punchOut = parsed.data.punchOut ? new Date(parsed.data.punchOut) : null;
+  const leave = parsed.data.isLeave ?? "None";
   const workingMinutes =
-    holiday || parsed.data.isLeave === "Leave" || parsed.data.isLeave === "WFH"
+    holiday || leave === "Leave" || leave === "WFH"
       ? 0
       : calculateWorkingMinutes(punchIn, punchOut);
-  const differenceMinutes = calculateDifferenceMinutes(
-    workingMinutes,
-    holiday,
-    parsed.data.isLeave ?? "None"
-  );
+  const isHalfDay = detectHalfDay(punchIn, punchOut, holiday, leave);
+  const differenceMinutes = calculateDifferenceMinutes(workingMinutes, holiday, leave, isHalfDay);
   const record = await Attendance.findOneAndUpdate(
     { userId: user._id, date },
     {

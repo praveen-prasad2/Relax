@@ -4,7 +4,13 @@ import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Attendance from "@/models/Attendance";
-import { getAttendanceMonthFromDate, getAttendanceMonthBounds } from "@/lib/attendance-calculator";
+import {
+  toDateKey,
+  parseDateKeyToDate,
+  getAttendanceMonthFromDate,
+  generateMonthDateKeys,
+  buildAttendanceRows,
+} from "@/lib/attendance-calculator";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -15,43 +21,39 @@ export async function GET(req: NextRequest) {
   const dateParam = req.nextUrl.searchParams.get("date");
   let today: Date;
   if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-    const [y, m, d] = dateParam.split("-").map(Number);
-    today = new Date(y, m - 1, d);
-    today.setHours(0, 0, 0, 0);
+    today = parseDateKeyToDate(dateParam);
   } else {
     today = new Date();
-    today.setHours(0, 0, 0, 0);
   }
-  const record = await Attendance.findOne({ userId: user._id, date: today }).lean();
+  const todayStr = toDateKey(today);
   const { year, month } = getAttendanceMonthFromDate(today);
-  const { start, end } = getAttendanceMonthBounds(year, month);
-  const endOfToday = new Date(today);
-  endOfToday.setHours(23, 59, 59, 999);
-  const totals = await Attendance.aggregate([
-    {
-      $match: {
-        userId: user._id,
-        date: { $gte: start, $lte: endOfToday },
-        $or: [
-          { date: { $lt: today } },
-          { punchOut: { $exists: true, $ne: null } },
-        ],
-      },
-    },
-    { $group: { _id: null, sum: { $sum: "$differenceMinutes" } } },
-  ]);
-  const monthlyDiff = totals[0]?.sum ?? 0;
+  const dateKeys = generateMonthDateKeys(year, month);
+  const keySet = new Set(dateKeys);
+  const rangeStart = new Date(parseDateKeyToDate(dateKeys[0]).getTime() - 86400000);
+  const rangeEnd = new Date(parseDateKeyToDate(dateKeys[dateKeys.length - 1]).getTime() + 86400000 * 2);
+  const raw = await Attendance.find({
+    userId: user._id,
+    date: { $gte: rangeStart, $lte: rangeEnd },
+  }).lean();
+  const recordByKey = new Map<string, (typeof raw)[0]>();
+  for (const r of raw) {
+    const key = toDateKey(new Date(r.date));
+    if (keySet.has(key)) recordByKey.set(key, r);
+  }
+  const rows = buildAttendanceRows(dateKeys, recordByKey, todayStr);
+  const todayRow = rows.find((r) => r.date === todayStr);
   return NextResponse.json({
-    today: record
+    today: todayRow
       ? {
-          punchIn: record.punchIn,
-          punchOut: record.punchOut,
-          workingMinutes: record.workingMinutes,
-          differenceMinutes: record.differenceMinutes,
-          isLeave: record.isLeave,
-          isHoliday: record.isHoliday,
+          punchIn: todayRow.punchIn,
+          punchOut: todayRow.punchOut,
+          workingMinutes: todayRow.workingMinutes,
+          differenceMinutes: todayRow.differenceMinutes,
+          isLeave: todayRow.isLeave,
+          isHoliday: todayRow.isHoliday,
+          isHalfDay: todayRow.isHalfDay,
         }
       : null,
-    monthlyDifferenceMinutes: monthlyDiff,
+    monthlyDifferenceMinutes: todayRow?.totalDifferenceMinutes ?? 0,
   });
 }

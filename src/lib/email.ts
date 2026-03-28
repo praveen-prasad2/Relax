@@ -17,8 +17,8 @@ export async function sendOtp(to: string, otp: string): Promise<void> {
   await transporter.sendMail({
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to,
-    subject: "Your Relax verification code",
-    text: `Your verification code is: ${otp}\n\nThis code expires in 10 minutes.`,
-    html: `<p>Your verification code is: <strong>${otp}</strong></p><p>This code expires in 10 minutes.</p>`,
+    subject: "Your TimeForge verification code",
+    text: `Your verification code is: ${otp}\n\nThis code expires in 10 minutes.\n\n— TimeForge by Praveen`,
+    html: `<p>Your verification code is: <strong>${otp}</strong></p><p>This code expires in 10 minutes.</p><p style="color:#cc161c;font-size:14px;margin-top:24px">TimeForge by Praveen</p>`,
   });
 }
