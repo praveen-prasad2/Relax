@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 import { HiOutlineArrowLeft } from "react-icons/hi2";
 
 const titles: Record<string, string> = {
-  "/dashboard": "Dashboard",
+  "/dashboard": "TimeForge",
   "/attendance": "Attendance",
   "/profile": "Profile",
 };
