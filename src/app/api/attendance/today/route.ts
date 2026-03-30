@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
+import { getAuthEmail } from "@/lib/auth-email";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Attendance from "@/models/Attendance";
@@ -12,11 +11,13 @@ import {
   buildAttendanceRows,
 } from "@/lib/attendance-calculator";
 
+export const runtime = "nodejs";
+
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const email = await getAuthEmail(req);
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await connectDB();
-  const user = await User.findOne({ email: session.user.email }).select("_id").lean();
+  const user = await User.findOne({ email }).select("_id").lean();
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   const dateParam = req.nextUrl.searchParams.get("date");
   let today: Date;

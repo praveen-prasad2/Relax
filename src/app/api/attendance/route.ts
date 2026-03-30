@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
+import { getAuthEmail } from "@/lib/auth-email";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Attendance from "@/models/Attendance";
@@ -26,17 +25,23 @@ const upsertSchema = z.object({
   isHoliday: z.boolean().optional(),
 });
 
+export const runtime = "nodejs";
+
 function parsePunch(iso: string | null | undefined): Date | null {
   if (iso == null || iso === "") return null;
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function isDuplicateKeyError(e: unknown): boolean {
+  return typeof e === "object" && e !== null && "code" in e && (e as { code: number }).code === 11000;
+}
+
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const email = await getAuthEmail(req);
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await connectDB();
-  const user = await User.findOne({ email: session.user.email }).select("_id").lean();
+  const user = await User.findOne({ email }).select("_id").lean();
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   const { searchParams } = new URL(req.url);
   const year = parseInt(searchParams.get("year") || "");
@@ -68,13 +73,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const email = await getAuthEmail(req);
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json();
   const parsed = upsertSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   await connectDB();
-  const user = await User.findOne({ email: session.user.email }).select("_id").lean();
+  const user = await User.findOne({ email }).select("_id").lean();
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   const dateKey = parsed.data.date;
   const dayStart = parseDateKeyToDate(dateKey);
@@ -113,28 +118,35 @@ export async function POST(req: NextRequest) {
   const isHalfDay = detectHalfDay(punchIn, punchOut, holiday, leave);
   const differenceMinutes = calculateDifferenceMinutes(workingMinutes, holiday, leave, isHalfDay);
 
-  const filter = existing?._id
-    ? { _id: existing._id }
-    : { userId: user._id, date: dayStart };
+  const doc = {
+    dayName,
+    date: dayStart,
+    punchIn,
+    punchOut,
+    isLeave: leave,
+    isHoliday: holiday,
+    workingMinutes,
+    differenceMinutes,
+  };
 
   try {
-    const record = await Attendance.findOneAndUpdate(
-      filter,
-      {
-        $set: {
-          dayName,
-          date: dayStart,
-          punchIn,
-          punchOut,
-          isLeave: leave,
-          isHoliday: holiday,
-          workingMinutes,
-          differenceMinutes,
-        },
-      },
-      { upsert: true, new: true }
-    );
-    return NextResponse.json({ ok: true, id: String(record?._id ?? "") });
+    if (existing?._id) {
+      await Attendance.updateOne({ _id: existing._id }, { $set: doc });
+      return NextResponse.json({ ok: true, id: String(existing._id) });
+    }
+    try {
+      const created = await Attendance.create({ userId: user._id, ...doc });
+      return NextResponse.json({ ok: true, id: String(created._id) });
+    } catch (e) {
+      if (!isDuplicateKeyError(e)) throw e;
+      const again = await Attendance.findOne({
+        userId: user._id,
+        date: { $gte: dayStart, $lt: dayEnd },
+      }).lean();
+      if (!again?._id) throw e;
+      await Attendance.updateOne({ _id: again._id }, { $set: { ...doc, date: dayStart } });
+      return NextResponse.json({ ok: true, id: String(again._id) });
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Save failed";
     return NextResponse.json({ error: msg }, { status: 500 });
