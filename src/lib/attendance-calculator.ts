@@ -155,22 +155,12 @@ export function buildAttendanceDateTimeISO(dateKey: string, timeHHmm: string): s
   return `${dateKey}T${h}:${m}:00+05:30`;
 }
 
-/** Format stored instant as HH:mm in ATTENDANCE_TZ (same path as server + all deploy targets). */
+/** Format stored instant as HH:mm IST (UTC+05:30 arithmetic; no Intl). */
 export function formatClockTimeIST(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
   const p = getISTDateTimeParts(d);
-  if (p) return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
-  try {
-    return new Intl.DateTimeFormat("sv-SE", {
-      timeZone: ATTENDANCE_TZ,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(d);
-  } catch {
-    return "";
-  }
+  return p ? `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}` : "";
 }
 
 export function clockTimeToInputValue(iso: string | null | undefined): string {
@@ -191,6 +181,9 @@ export type AttendanceRowComputed = {
   dayName: string;
   punchIn: string | null;
   punchOut: string | null;
+  /** Precomputed IST HH:mm from API (use for display so live matches entered time without relying on client bundle). */
+  punchInDisplay: string | null;
+  punchOutDisplay: string | null;
   isLeave: string;
   isHoliday: boolean;
   isHalfDay: boolean;
@@ -222,12 +215,16 @@ export function buildAttendanceRows(
     const isTodayNoOut = key === todayStr && !punchOut;
     const isFuture = key > todayStr;
     if (!isFuture && !isTodayNoOut) runningDiff += diff;
+    const inIso = punchIn?.toISOString() ?? null;
+    const outIso = punchOut?.toISOString() ?? null;
     return {
       _id: existing?._id,
       date: key,
       dayName,
-      punchIn: punchIn?.toISOString() ?? null,
-      punchOut: punchOut?.toISOString() ?? null,
+      punchIn: inIso,
+      punchOut: outIso,
+      punchInDisplay: inIso ? formatClockTimeIST(inIso) || null : null,
+      punchOutDisplay: outIso ? formatClockTimeIST(outIso) || null : null,
       isLeave: leave,
       isHoliday: holiday,
       isHalfDay,

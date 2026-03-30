@@ -23,6 +23,8 @@ interface Row {
   dayName: string;
   punchIn: string | null;
   punchOut: string | null;
+  punchInDisplay?: string | null;
+  punchOutDisplay?: string | null;
   isLeave: string;
   isHoliday: boolean;
   isHalfDay?: boolean;
@@ -80,12 +82,20 @@ export function AttendanceTable({
     onError: () => showSnackbar("Failed to save", "error"),
   });
 
-  const formatTimeAsEntered = (iso: string | null) => formatClockTimeIST(iso) || "-";
-  const timeToInput = (iso: string | null) => clockTimeToInputValue(iso);
+  const formatTimeAsEntered = (iso: string | null, display?: string | null) =>
+    (display ?? formatClockTimeIST(iso)) || "-";
+  const timeToInput = (iso: string | null, display?: string | null) => display ?? clockTimeToInputValue(iso);
 
   const startEdit = (row: Row) => {
     setEditingRow(row.date);
-    setForm({ punchIn: row.punchIn, punchOut: row.punchOut, isLeave: row.isLeave, isHoliday: row.isHoliday });
+    setForm({
+      punchIn: row.punchIn,
+      punchOut: row.punchOut,
+      punchInDisplay: row.punchInDisplay,
+      punchOutDisplay: row.punchOutDisplay,
+      isLeave: row.isLeave,
+      isHoliday: row.isHoliday,
+    });
   };
 
   const save = () => {
@@ -162,22 +172,24 @@ export function AttendanceTable({
                     <div className="flex flex-wrap gap-2">
                       <input
                         type="time"
-                        value={timeToInput(form.punchIn ?? null)}
+                        value={timeToInput(form.punchIn ?? null, form.punchInDisplay ?? undefined)}
                         onChange={(e) =>
                           setForm((f) => ({
                             ...f,
                             punchIn: e.target.value ? buildAttendanceDateTimeISO(row.date, e.target.value) : undefined,
+                            punchInDisplay: e.target.value || undefined,
                           }))
                         }
                         className="rounded-lg border border-[#E5E7EB] px-2 py-1.5 text-sm"
                       />
                       <input
                         type="time"
-                        value={timeToInput(form.punchOut ?? null)}
+                        value={timeToInput(form.punchOut ?? null, form.punchOutDisplay ?? undefined)}
                         onChange={(e) =>
                           setForm((f) => ({
                             ...f,
                             punchOut: e.target.value ? buildAttendanceDateTimeISO(row.date, e.target.value) : undefined,
+                            punchOutDisplay: e.target.value || undefined,
                           }))
                         }
                         className="rounded-lg border border-[#E5E7EB] px-2 py-1.5 text-sm"
@@ -221,8 +233,8 @@ export function AttendanceTable({
                       {isToday && <span className="ml-1 text-[#cc161c] text-xs">Today</span>}
                     </div>
                     <span className="min-w-[70px] text-[#6B7280]">{row.dayName}</span>
-                    <span className="min-w-[55px] text-[#6B7280]">{formatTimeAsEntered(row.punchIn)}</span>
-                    <span className="min-w-[55px] text-[#6B7280]">{formatTimeAsEntered(row.punchOut)}</span>
+                    <span className="min-w-[55px] text-[#6B7280]">{formatTimeAsEntered(row.punchIn, row.punchInDisplay)}</span>
+                    <span className="min-w-[55px] text-[#6B7280]">{formatTimeAsEntered(row.punchOut, row.punchOutDisplay)}</span>
                     <span className="min-w-[56px]">
                       {row.isLeave === "Leave" ? (
                         <span className="rounded-md bg-orange-500 px-2 py-0.5 text-xs font-medium text-white">Leave</span>

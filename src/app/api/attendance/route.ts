@@ -52,7 +52,10 @@ export async function GET(req: NextRequest) {
   const todayStr =
     todayParam && /^\d{4}-\d{2}-\d{2}$/.test(todayParam) ? todayParam : toDateKey(new Date());
   const rows = buildAttendanceRows(dateKeys, recordByKey, todayStr);
-  return NextResponse.json({ rows });
+  return NextResponse.json(
+    { rows },
+    { headers: { "Cache-Control": "private, no-store, must-revalidate" } }
+  );
 }
 
 export async function POST(req: NextRequest) {

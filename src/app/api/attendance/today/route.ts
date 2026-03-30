@@ -42,18 +42,23 @@ export async function GET(req: NextRequest) {
   }
   const rows = buildAttendanceRows(dateKeys, recordByKey, todayStr);
   const todayRow = rows.find((r) => r.date === todayStr);
-  return NextResponse.json({
-    today: todayRow
-      ? {
-          punchIn: todayRow.punchIn,
-          punchOut: todayRow.punchOut,
-          workingMinutes: todayRow.workingMinutes,
-          differenceMinutes: todayRow.differenceMinutes,
-          isLeave: todayRow.isLeave,
-          isHoliday: todayRow.isHoliday,
-          isHalfDay: todayRow.isHalfDay,
-        }
-      : null,
-    monthlyDifferenceMinutes: todayRow?.totalDifferenceMinutes ?? 0,
-  });
+  return NextResponse.json(
+    {
+      today: todayRow
+        ? {
+            punchIn: todayRow.punchIn,
+            punchOut: todayRow.punchOut,
+            punchInDisplay: todayRow.punchInDisplay,
+            punchOutDisplay: todayRow.punchOutDisplay,
+            workingMinutes: todayRow.workingMinutes,
+            differenceMinutes: todayRow.differenceMinutes,
+            isLeave: todayRow.isLeave,
+            isHoliday: todayRow.isHoliday,
+            isHalfDay: todayRow.isHalfDay,
+          }
+        : null,
+      monthlyDifferenceMinutes: todayRow?.totalDifferenceMinutes ?? 0,
+    },
+    { headers: { "Cache-Control": "private, no-store, must-revalidate" } }
+  );
 }
