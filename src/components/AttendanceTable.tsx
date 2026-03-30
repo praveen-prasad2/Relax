@@ -12,6 +12,7 @@ import {
   formatClockTimeIST,
   clockTimeToInputValue,
   buildAttendanceDateTimeISO,
+  resolvePunchOutIso,
 } from "@/lib/attendance-calculator";
 import { useSnackbar } from "@/components/Snackbar";
 
@@ -67,7 +68,13 @@ export function AttendanceTable({
   }, [rows, filter]);
 
   const mutation = useMutation({
-    mutationFn: (payload: { date: string; punchIn?: string; punchOut?: string; isLeave?: string; isHoliday?: boolean }) =>
+    mutationFn: (payload: {
+      date: string;
+      punchIn: string | null;
+      punchOut: string | null;
+      isLeave: string;
+      isHoliday: boolean;
+    }) =>
       fetch("/api/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -102,10 +109,10 @@ export function AttendanceTable({
     if (!editingRow) return;
     mutation.mutate({
       date: editingRow,
-      punchIn: form.punchIn ?? undefined,
-      punchOut: form.punchOut ?? undefined,
-      isLeave: form.isLeave ?? undefined,
-      isHoliday: form.isHoliday,
+      punchIn: form.punchIn ?? null,
+      punchOut: form.punchOut ?? null,
+      isLeave: form.isLeave ?? "None",
+      isHoliday: form.isHoliday ?? false,
     });
   };
 
@@ -173,25 +180,35 @@ export function AttendanceTable({
                       <input
                         type="time"
                         value={timeToInput(form.punchIn ?? null, form.punchInDisplay ?? undefined)}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            punchIn: e.target.value ? buildAttendanceDateTimeISO(row.date, e.target.value) : undefined,
-                            punchInDisplay: e.target.value || undefined,
-                          }))
-                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setForm((f) => {
+                            const punchIn = v ? buildAttendanceDateTimeISO(row.date, v) : undefined;
+                            const punchInDisplay = v || undefined;
+                            let punchOut = f.punchOut;
+                            let punchOutDisplay = f.punchOutDisplay;
+                            if (v && f.punchOutDisplay) {
+                              const resolved = resolvePunchOutIso(row.date, punchIn ?? null, f.punchOutDisplay);
+                              if (resolved) {
+                                punchOut = resolved;
+                              }
+                            }
+                            return { ...f, punchIn, punchInDisplay, punchOut, punchOutDisplay };
+                          });
+                        }}
                         className="rounded-lg border border-[#E5E7EB] px-2 py-1.5 text-sm"
                       />
                       <input
                         type="time"
                         value={timeToInput(form.punchOut ?? null, form.punchOutDisplay ?? undefined)}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const v = e.target.value;
                           setForm((f) => ({
                             ...f,
-                            punchOut: e.target.value ? buildAttendanceDateTimeISO(row.date, e.target.value) : undefined,
-                            punchOutDisplay: e.target.value || undefined,
-                          }))
-                        }
+                            punchOut: v ? resolvePunchOutIso(row.date, f.punchIn ?? null, v) ?? undefined : undefined,
+                            punchOutDisplay: v || undefined,
+                          }));
+                        }}
                         className="rounded-lg border border-[#E5E7EB] px-2 py-1.5 text-sm"
                       />
                       <select

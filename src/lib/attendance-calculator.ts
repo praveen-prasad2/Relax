@@ -155,12 +155,52 @@ export function buildAttendanceDateTimeISO(dateKey: string, timeHHmm: string): s
   return `${dateKey}T${h}:${m}:00+05:30`;
 }
 
-/** Format stored instant as HH:mm IST (UTC+05:30 arithmetic; no Intl). */
+/** Next calendar day in IST (dateKey YYYY-MM-DD). */
+export function addDaysToDateKey(dateKey: string, days: number): string {
+  const base = parseDateKeyToDate(dateKey);
+  return toDateKey(new Date(base.getTime() + days * 86400000));
+}
+
+/**
+ * Punch-out time on `<input type="time">` is same-day unless it would fall before punch-in on that row;
+ * then it is the next IST day (overnight shift).
+ */
+export function resolvePunchOutIso(
+  rowDateKey: string,
+  punchInIso: string | null | undefined,
+  outTimeHHmm: string
+): string | null {
+  const trimmed = outTimeHHmm.trim();
+  if (!trimmed) return null;
+  const sameDay = buildAttendanceDateTimeISO(rowDateKey, trimmed);
+  if (!punchInIso) return sameDay;
+  const inMs = new Date(punchInIso).getTime();
+  const outSameMs = new Date(sameDay).getTime();
+  if (Number.isNaN(inMs) || Number.isNaN(outSameMs)) return sameDay;
+  if (outSameMs > inMs) return sameDay;
+  const nextKey = addDaysToDateKey(rowDateKey, 1);
+  return buildAttendanceDateTimeISO(nextKey, trimmed);
+}
+
+/** If punch-out is not strictly after punch-in (e.g. overnight stored as same calendar day), advance by whole IST days. */
+export function ensurePunchOutAfterIn(punchIn: Date | null, punchOut: Date | null): Date | null {
+  if (!punchIn || !punchOut) return punchOut;
+  let out = punchOut;
+  let guard = 0;
+  while (out.getTime() <= punchIn.getTime() && guard < 4) {
+    out = new Date(out.getTime() + 86400000);
+    guard++;
+  }
+  return out;
+}
+
+/** Format stored instant as HH:mm IST (UTC+05:30; uses `Date.parse` so ISO with Z/offset is unambiguous). */
 export function formatClockTimeIST(iso: string | null | undefined): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  const p = getISTDateTimeParts(d);
-  return p ? `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}` : "";
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return "";
+  const shifted = new Date(ms + IST_OFFSET_MS);
+  return `${String(shifted.getUTCHours()).padStart(2, "0")}:${String(shifted.getUTCMinutes()).padStart(2, "0")}`;
 }
 
 export function clockTimeToInputValue(iso: string | null | undefined): string {

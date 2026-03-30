@@ -14,16 +14,23 @@ import {
   calculateDifferenceMinutes,
   buildAttendanceRows,
   detectHalfDay,
+  ensurePunchOutAfterIn,
 } from "@/lib/attendance-calculator";
 import { z } from "zod";
 
 const upsertSchema = z.object({
   date: z.string(),
-  punchIn: z.string().optional().nullable(),
-  punchOut: z.string().optional().nullable(),
+  punchIn: z.union([z.string(), z.null()]).optional(),
+  punchOut: z.union([z.string(), z.null()]).optional(),
   isLeave: z.enum(["None", "Leave", "WFH"]).optional(),
   isHoliday: z.boolean().optional(),
 });
+
+function parsePunch(iso: string | null | undefined): Date | null {
+  if (iso == null || iso === "") return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -69,10 +76,29 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   const date = parseDateKeyToDate(parsed.data.date);
   const dayName = getDayName(date);
-  const holiday = parsed.data.isHoliday ?? isSunday(date);
-  const punchIn = parsed.data.punchIn ? new Date(parsed.data.punchIn) : null;
-  const punchOut = parsed.data.punchOut ? new Date(parsed.data.punchOut) : null;
-  const leave = parsed.data.isLeave ?? "None";
+  const existing = await Attendance.findOne({ userId: user._id, date }).lean();
+
+  const punchIn: Date | null =
+    parsed.data.punchIn !== undefined
+      ? parsePunch(parsed.data.punchIn)
+      : existing?.punchIn
+        ? new Date(existing.punchIn as string | Date)
+        : null;
+  let punchOut: Date | null =
+    parsed.data.punchOut !== undefined
+      ? parsePunch(parsed.data.punchOut)
+      : existing?.punchOut
+        ? new Date(existing.punchOut as string | Date)
+        : null;
+  punchOut = ensurePunchOutAfterIn(punchIn, punchOut);
+
+  const leave =
+    parsed.data.isLeave !== undefined ? parsed.data.isLeave : (existing?.isLeave ?? "None");
+  const holiday =
+    parsed.data.isHoliday !== undefined
+      ? parsed.data.isHoliday
+      : (existing?.isHoliday ?? isSunday(date));
+
   const workingMinutes =
     holiday || leave === "Leave" || leave === "WFH"
       ? 0
@@ -83,9 +109,9 @@ export async function POST(req: NextRequest) {
     { userId: user._id, date },
     {
       dayName,
-      punchIn: punchIn || undefined,
-      punchOut: punchOut || undefined,
-      isLeave: parsed.data.isLeave ?? "None",
+      punchIn,
+      punchOut,
+      isLeave: leave,
       isHoliday: holiday,
       workingMinutes,
       differenceMinutes,
