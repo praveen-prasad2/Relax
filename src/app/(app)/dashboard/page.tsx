@@ -26,7 +26,8 @@ export default function DashboardPage() {
 
   const { data: today, isLoading: todayLoading } = useQuery({
     queryKey: ["attendance-today"],
-    queryFn: () => fetch(`/api/attendance/today?date=${todayKey}`).then((r) => r.json()),
+    queryFn: () =>
+      fetch(`/api/attendance/today?date=${todayKey}`, { credentials: "include" }).then((r) => r.json()),
     refetchOnWindowFocus: true,
     refetchInterval: false,
   });
@@ -34,7 +35,9 @@ export default function DashboardPage() {
   const { data: monthData, isLoading: monthLoading } = useQuery({
     queryKey: ["attendance", year, month],
     queryFn: () =>
-      fetch(`/api/attendance?year=${year}&month=${month}&today=${todayKey}`).then((r) => r.json()),
+      fetch(`/api/attendance?year=${year}&month=${month}&today=${todayKey}`, {
+        credentials: "include",
+      }).then((r) => r.json()),
     refetchOnWindowFocus: true,
   });
 

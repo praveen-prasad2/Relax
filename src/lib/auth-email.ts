@@ -42,12 +42,13 @@ export async function getAuthEmail(req: NextRequest): Promise<string | null> {
   if (!secret) {
     logApi(TAG, "NEXTAUTH_SECRET missing — JWT verify will fail");
   } else {
-    const cookie = req.headers.get("cookie") ?? "";
-    if (dbg()) logApi(TAG, "cookie", { length: cookie.length, hasSessionToken: /session-token/i.test(cookie) });
-    const token = await getToken({
-      req: { headers: { cookie } } as any,
-      secret,
-    });
+    if (dbg()) {
+      const h = req.headers.get("cookie") ?? "";
+      logApi(TAG, "cookie header", { length: h.length, hasSessionToken: /session-token/i.test(h) });
+    }
+    // Must pass the real NextRequest: getToken uses SessionStore which reads req.cookies.getAll(),
+    // not the Cookie header alone. A fake { headers: { cookie } } leaves cookies undefined → always 401.
+    const token = await getToken({ req: req as any, secret });
     if (!token) {
       logApi(TAG, "getToken returned null — check NEXTAUTH_SECRET, cookie, expiry");
     } else if (dbg()) {

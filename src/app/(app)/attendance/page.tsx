@@ -16,7 +16,9 @@ export default function AttendancePage() {
     queryKey: ["attendance", year, month],
     queryFn: () => {
       const t = toDateKey(new Date());
-      return fetch(`/api/attendance?year=${year}&month=${month}&today=${t}`).then((r) => r.json());
+      return fetch(`/api/attendance?year=${year}&month=${month}&today=${t}`, {
+        credentials: "include",
+      }).then((r) => r.json());
     },
     refetchOnWindowFocus: true,
     refetchInterval: false,
