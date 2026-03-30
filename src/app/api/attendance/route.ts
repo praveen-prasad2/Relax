@@ -17,7 +17,11 @@ import {
 } from "@/lib/attendance-calculator";
 import { z } from "zod";
 import { logApi, logApiError } from "@/lib/server-debug";
-import { indexAttendanceByIstDateKey, findExistingAttendanceForDateKey } from "@/lib/attendance-queries";
+import {
+  indexAttendanceByIstDateKey,
+  findExistingAttendanceForDateKey,
+  deleteDuplicateAttendanceForIstDay,
+} from "@/lib/attendance-queries";
 
 const TAG = "attendance-api";
 
@@ -165,12 +169,14 @@ export async function POST(req: NextRequest) {
         logApiError(TAG, "updateOne matched 0 documents — _id mismatch?", existing._id);
         return NextResponse.json({ error: "Could not update attendance row" }, { status: 409 });
       }
-      return NextResponse.json({ ok: true, id: String(existing._id) });
+      await deleteDuplicateAttendanceForIstDay(user._id, dateKey, existing._id);
+      return NextResponse.json({ ok: true, id: String(existing._id), saved: true });
     }
     try {
       const created = await Attendance.create({ userId: user._id, ...doc });
       logApi(TAG, "create ok", { id: String(created._id) });
-      return NextResponse.json({ ok: true, id: String(created._id) });
+      await deleteDuplicateAttendanceForIstDay(user._id, dateKey, created._id);
+      return NextResponse.json({ ok: true, id: String(created._id), saved: true });
     } catch (e) {
       if (!isDuplicateKeyError(e)) throw e;
       logApi(TAG, "create duplicate key — retrying find + update");
@@ -178,7 +184,8 @@ export async function POST(req: NextRequest) {
       if (!again?._id) throw e;
       await Attendance.updateOne({ _id: again._id }, { $set: { ...doc, date: dayStart } });
       logApi(TAG, "retry update ok", { id: String(again._id) });
-      return NextResponse.json({ ok: true, id: String(again._id) });
+      await deleteDuplicateAttendanceForIstDay(user._id, dateKey, again._id);
+      return NextResponse.json({ ok: true, id: String(again._id), saved: true });
     }
   } catch (e) {
     logApiError(TAG, "POST save failed", e);

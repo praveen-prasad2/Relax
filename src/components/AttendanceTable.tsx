@@ -13,6 +13,7 @@ import {
   clockTimeToInputValue,
   buildAttendanceDateTimeISO,
   resolvePunchOutIso,
+  compareDateKeys,
 } from "@/lib/attendance-calculator";
 import { useSnackbar } from "@/components/Snackbar";
 
@@ -83,6 +84,7 @@ export function AttendanceTable({
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean };
       if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
+      if (data.ok !== true) throw new Error(data.error || "Save failed");
       return data;
     },
     onSuccess: () => {
@@ -154,8 +156,8 @@ export function AttendanceTable({
           ))}
         </div>
         {filteredRows.map((row, i) => {
-          const isToday = row.date === todayStr;
-          const isFuture = row.date > todayStr;
+          const isToday = compareDateKeys(row.date, todayStr) === 0;
+          const isFuture = compareDateKeys(row.date, todayStr) > 0;
           const canEdit = !isFuture;
           const isEditing = editingRow === row.date;
           const isHolidayRow = isEditing ? (form.isHoliday ?? row.isHoliday) : row.isHoliday;

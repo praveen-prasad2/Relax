@@ -39,6 +39,18 @@ export function parseDateKeyToDate(dateKey: string): Date {
   return new Date(`${dateKey}T00:00:00+05:30`);
 }
 
+/** Compare calendar date keys (YYYY-MM-DD or Y-M-D); avoids string bugs like "2026-3-28" > "2026-03-29". */
+export function compareDateKeys(a: string, b: string): number {
+  const pa = a.split("-").map((x) => parseInt(x, 10));
+  const pb = b.split("-").map((x) => parseInt(x, 10));
+  if (pa.length !== 3 || pb.length !== 3 || pa.some((n) => Number.isNaN(n)) || pb.some((n) => Number.isNaN(n))) {
+    return a.localeCompare(b);
+  }
+  if (pa[0] !== pb[0]) return pa[0] - pb[0];
+  if (pa[1] !== pb[1]) return pa[1] - pb[1];
+  return pa[2] - pb[2];
+}
+
 export function getAttendanceMonthBounds(year: number, month: number): { start: Date; end: Date } {
   const start = new Date(Date.UTC(year, month - 2, 24));
   const end = new Date(Date.UTC(year, month - 1, 23));

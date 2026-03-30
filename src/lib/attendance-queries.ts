@@ -86,3 +86,32 @@ export async function findExistingAttendanceForDateKey(
   }
   return matching[0] ?? null;
 }
+
+/** After a successful save, remove other Mongo docs for the same IST day so GET/POST stay consistent. */
+export async function deleteDuplicateAttendanceForIstDay(
+  userId: Types.ObjectId,
+  dateKey: string,
+  keepId: unknown
+): Promise<number> {
+  const dayStart = parseDateKeyToDate(dateKey);
+  const dayEnd = new Date(dayStart.getTime() + 86400000);
+  const wideStart = new Date(dayStart.getTime() - PADDING_MS);
+  const wideEnd = new Date(dayEnd.getTime() + PADDING_MS);
+
+  const candidates = await Attendance.find({
+    userId,
+    date: { $gte: wideStart, $lte: wideEnd },
+  }).lean();
+
+  const dupes = candidates.filter(
+    (r) =>
+      String(r._id) !== String(keepId) && toDateKey(new Date(r.date as string | Date)) === dateKey
+  );
+  if (dupes.length === 0) return 0;
+  const result = await Attendance.deleteMany({ _id: { $in: dupes.map((d) => d._id) } });
+  console.log("[attendance-queries] deleted duplicate IST-day rows", {
+    dateKey,
+    deleted: result.deletedCount,
+  });
+  return result.deletedCount;
+}
