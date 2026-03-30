@@ -68,25 +68,29 @@ export function AttendanceTable({
   }, [rows, filter]);
 
   const mutation = useMutation({
-    mutationFn: (payload: {
+    mutationFn: async (payload: {
       date: string;
       punchIn: string | null;
       punchOut: string | null;
       isLeave: string;
       isHoliday: boolean;
-    }) =>
-      fetch("/api/attendance", {
+    }) => {
+      const res = await fetch("/api/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean };
+      if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
+      return data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance", year, month] });
       queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
       setEditingRow(null);
       showSnackbar("Attendance saved", "success");
     },
-    onError: () => showSnackbar("Failed to save", "error"),
+    onError: (err: Error) => showSnackbar(err.message || "Failed to save", "error"),
   });
 
   const formatTimeAsEntered = (iso: string | null, display?: string | null) =>
@@ -116,7 +120,7 @@ export function AttendanceTable({
     });
   };
 
-  const headerLabels = ["Date", "Day", "In", "Out", "Status", "Holiday", "Worked", "Daily Diff", "Total Diff", "Actions"];
+  const headerLabels = ["Date", "Day", "In (IST)", "Out (IST)", "Status", "Holiday", "Worked", "Daily Diff", "Total Diff", "Actions"];
 
   const filterButtons: { key: FilterType; label: string; className: string }[] = [
     { key: "all", label: "All", className: filter === "all" ? "bg-[#cc161c] text-white" : "bg-white text-[#6B7280] border border-[#E5E7EB]" },
@@ -160,7 +164,7 @@ export function AttendanceTable({
               key={row.date}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.02 }}
+              transition={{ delay: 0 }}
               className={`rounded-xl border overflow-hidden ${
                 isHolidayRow
                   ? `border-[#d65c62] bg-[#e07377] ${isToday ? "ring-2 ring-[#cc161c] ring-offset-1" : ""}`

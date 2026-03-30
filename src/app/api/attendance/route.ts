@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await connectDB();
-  const user = await User.findOne({ email: session.user.email });
+  const user = await User.findOne({ email: session.user.email }).select("_id").lean();
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   const { searchParams } = new URL(req.url);
   const year = parseInt(searchParams.get("year") || "");
@@ -49,7 +49,9 @@ export async function GET(req: NextRequest) {
   const raw = await Attendance.find({
     userId: user._id,
     date: { $gte: rangeStart, $lte: rangeEnd },
-  }).lean();
+  })
+    .select("date punchIn punchOut isLeave isHoliday workingMinutes differenceMinutes")
+    .lean();
   const recordByKey = new Map<string, (typeof raw)[0]>();
   for (const r of raw) {
     const key = toDateKey(new Date(r.date));
@@ -72,11 +74,16 @@ export async function POST(req: NextRequest) {
   const parsed = upsertSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   await connectDB();
-  const user = await User.findOne({ email: session.user.email });
+  const user = await User.findOne({ email: session.user.email }).select("_id").lean();
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
-  const date = parseDateKeyToDate(parsed.data.date);
-  const dayName = getDayName(date);
-  const existing = await Attendance.findOne({ userId: user._id, date }).lean();
+  const dateKey = parsed.data.date;
+  const dayStart = parseDateKeyToDate(dateKey);
+  const dayEnd = new Date(dayStart.getTime() + 86400000);
+  const dayName = getDayName(dayStart);
+  const existing = await Attendance.findOne({
+    userId: user._id,
+    date: { $gte: dayStart, $lt: dayEnd },
+  }).lean();
 
   const punchIn: Date | null =
     parsed.data.punchIn !== undefined
@@ -97,7 +104,7 @@ export async function POST(req: NextRequest) {
   const holiday =
     parsed.data.isHoliday !== undefined
       ? parsed.data.isHoliday
-      : (existing?.isHoliday ?? isSunday(date));
+      : (existing?.isHoliday ?? isSunday(dayStart));
 
   const workingMinutes =
     holiday || leave === "Leave" || leave === "WFH"
@@ -105,18 +112,31 @@ export async function POST(req: NextRequest) {
       : calculateWorkingMinutes(punchIn, punchOut);
   const isHalfDay = detectHalfDay(punchIn, punchOut, holiday, leave);
   const differenceMinutes = calculateDifferenceMinutes(workingMinutes, holiday, leave, isHalfDay);
-  const record = await Attendance.findOneAndUpdate(
-    { userId: user._id, date },
-    {
-      dayName,
-      punchIn,
-      punchOut,
-      isLeave: leave,
-      isHoliday: holiday,
-      workingMinutes,
-      differenceMinutes,
-    },
-    { upsert: true, new: true }
-  );
-  return NextResponse.json(record);
+
+  const filter = existing?._id
+    ? { _id: existing._id }
+    : { userId: user._id, date: dayStart };
+
+  try {
+    const record = await Attendance.findOneAndUpdate(
+      filter,
+      {
+        $set: {
+          dayName,
+          date: dayStart,
+          punchIn,
+          punchOut,
+          isLeave: leave,
+          isHoliday: holiday,
+          workingMinutes,
+          differenceMinutes,
+        },
+      },
+      { upsert: true, new: true }
+    );
+    return NextResponse.json({ ok: true, id: String(record?._id ?? "") });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Save failed";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }

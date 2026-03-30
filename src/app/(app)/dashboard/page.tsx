@@ -28,7 +28,7 @@ export default function DashboardPage() {
     queryKey: ["attendance-today"],
     queryFn: () => fetch(`/api/attendance/today?date=${todayKey}`).then((r) => r.json()),
     refetchOnWindowFocus: true,
-    refetchInterval: 60_000,
+    refetchInterval: false,
   });
 
   const { data: monthData, isLoading: monthLoading } = useQuery({

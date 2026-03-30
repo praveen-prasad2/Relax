@@ -11,10 +11,6 @@ export default function AttendancePage() {
   const [year, setYear] = useState(() => getAttendanceMonthFromDate(new Date()).year);
   const [month, setMonth] = useState(() => getAttendanceMonthFromDate(new Date()).month);
 
-  const isViewingCurrentMonth = (() => {
-    const cur = getAttendanceMonthFromDate(new Date());
-    return year === cur.year && month === cur.month;
-  })();
   const todayStr = toDateKey(new Date());
   const { data, isLoading } = useQuery({
     queryKey: ["attendance", year, month],
@@ -23,7 +19,7 @@ export default function AttendancePage() {
       return fetch(`/api/attendance?year=${year}&month=${month}&today=${t}`).then((r) => r.json());
     },
     refetchOnWindowFocus: true,
-    refetchInterval: isViewingCurrentMonth ? 60_000 : false,
+    refetchInterval: false,
   });
 
   useEffect(() => {

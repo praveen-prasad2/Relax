@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await connectDB();
-  const user = await User.findOne({ email: session.user.email });
+  const user = await User.findOne({ email: session.user.email }).select("_id").lean();
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   const dateParam = req.nextUrl.searchParams.get("date");
   let today: Date;
@@ -34,7 +34,9 @@ export async function GET(req: NextRequest) {
   const raw = await Attendance.find({
     userId: user._id,
     date: { $gte: rangeStart, $lte: rangeEnd },
-  }).lean();
+  })
+    .select("date punchIn punchOut isLeave isHoliday workingMinutes differenceMinutes")
+    .lean();
   const recordByKey = new Map<string, (typeof raw)[0]>();
   for (const r of raw) {
     const key = toDateKey(new Date(r.date));
