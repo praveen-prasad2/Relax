@@ -7,34 +7,31 @@ const HALF_DAY_OUT_UNTIL = 16 * 60 + 30;
 /** Calendar + attendance cycle use India timezone (matches typical deployment / users). */
 export const ATTENDANCE_TZ = "Asia/Kolkata";
 
+/** India Standard Time is fixed UTC+05:30 (no DST). Same result in Node, browsers, and Vercel. */
+const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+
 /**
- * IST calendar date + clock from the same `toLocaleString` output (sv-SE is stable on Node + browsers).
- * Avoids en-GB formatToParts differences between local dev and production (e.g. Vercel).
+ * IST calendar date + wall clock from a UTC instant (Mongo `Date`).
+ * Avoids `toLocaleString`/`formatToParts` inconsistencies that can show UTC as local clock on some runtimes.
  */
 function getISTDateTimeParts(date: Date): { dateKey: string; hour: number; minute: number } | null {
   if (Number.isNaN(date.getTime())) return null;
-  const raw = date.toLocaleString("sv-SE", { timeZone: ATTENDANCE_TZ });
-  const normalized = raw.replace(/\u202f/g, " ").trim();
-  const segments = normalized.split(/[\s,]+/).filter(Boolean);
-  if (segments.length < 2) return null;
-  const dateKey = segments[0];
-  const timeSeg = segments[1];
-  const [hStr, mStr] = timeSeg.split(":");
-  const hour = parseInt(hStr ?? "0", 10);
-  const minute = parseInt(mStr ?? "0", 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || Number.isNaN(hour) || Number.isNaN(minute)) return null;
-  return { dateKey, hour, minute };
+  const shifted = new Date(date.getTime() + IST_OFFSET_MS);
+  const y = shifted.getUTCFullYear();
+  const mo = shifted.getUTCMonth() + 1;
+  const day = shifted.getUTCDate();
+  const hour = shifted.getUTCHours();
+  const minute = shifted.getUTCMinutes();
+  return {
+    dateKey: `${y}-${String(mo).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+    hour,
+    minute,
+  };
 }
 
 /** YYYY-MM-DD in ATTENDANCE_TZ (same logic everywhere: dev, Vercel, all browsers). */
 export function toDateKey(date: Date): string {
-  const p = getISTDateTimeParts(date);
-  if (p?.dateKey) return p.dateKey;
-  try {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: ATTENDANCE_TZ }).format(date);
-  } catch {
-    return "";
-  }
+  return getISTDateTimeParts(date)?.dateKey ?? "";
 }
 
 /** Start of that calendar day in IST as a UTC instant (stable in MongoDB). */
