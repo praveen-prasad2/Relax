@@ -7,9 +7,34 @@ const HALF_DAY_OUT_UNTIL = 16 * 60 + 30;
 /** Calendar + attendance cycle use India timezone (matches typical deployment / users). */
 export const ATTENDANCE_TZ = "Asia/Kolkata";
 
-/** YYYY-MM-DD in ATTENDANCE_TZ (works in browser + Node). */
+/**
+ * IST calendar date + clock from the same `toLocaleString` output (sv-SE is stable on Node + browsers).
+ * Avoids en-GB formatToParts differences between local dev and production (e.g. Vercel).
+ */
+function getISTDateTimeParts(date: Date): { dateKey: string; hour: number; minute: number } | null {
+  if (Number.isNaN(date.getTime())) return null;
+  const raw = date.toLocaleString("sv-SE", { timeZone: ATTENDANCE_TZ });
+  const normalized = raw.replace(/\u202f/g, " ").trim();
+  const segments = normalized.split(/[\s,]+/).filter(Boolean);
+  if (segments.length < 2) return null;
+  const dateKey = segments[0];
+  const timeSeg = segments[1];
+  const [hStr, mStr] = timeSeg.split(":");
+  const hour = parseInt(hStr ?? "0", 10);
+  const minute = parseInt(mStr ?? "0", 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  return { dateKey, hour, minute };
+}
+
+/** YYYY-MM-DD in ATTENDANCE_TZ (same logic everywhere: dev, Vercel, all browsers). */
 export function toDateKey(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: ATTENDANCE_TZ }).format(date);
+  const p = getISTDateTimeParts(date);
+  if (p?.dateKey) return p.dateKey;
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: ATTENDANCE_TZ }).format(date);
+  } catch {
+    return "";
+  }
 }
 
 /** Start of that calendar day in IST as a UTC instant (stable in MongoDB). */
@@ -65,14 +90,11 @@ export function calculateWorkingMinutes(punchIn: Date | null, punchOut: Date | n
   return Math.max(0, Math.floor((punchOut.getTime() - punchIn.getTime()) / 60000));
 }
 
-/** Minutes from midnight in ATTENDANCE_TZ (uses sv-SE + tz for reliable parsing vs formatToParts). */
+/** Minutes from midnight in ATTENDANCE_TZ. */
 export function getMinutesSinceMidnightIST(date: Date): number {
-  const s = date.toLocaleString("sv-SE", { timeZone: ATTENDANCE_TZ });
-  const timePart = s.split(" ")[1];
-  if (!timePart) return 0;
-  const [h, m] = timePart.split(":").map((x) => parseInt(x, 10));
-  if (Number.isNaN(h) || Number.isNaN(m)) return 0;
-  return h * 60 + m;
+  const p = getISTDateTimeParts(date);
+  if (!p) return 0;
+  return p.hour * 60 + p.minute;
 }
 
 /**
@@ -136,20 +158,22 @@ export function buildAttendanceDateTimeISO(dateKey: string, timeHHmm: string): s
   return `${dateKey}T${h}:${m}:00+05:30`;
 }
 
-/** Format stored instant as HH:mm in ATTENDANCE_TZ (what the user expects to see). */
+/** Format stored instant as HH:mm in ATTENDANCE_TZ (same path as server + all deploy targets). */
 export function formatClockTimeIST(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: ATTENDANCE_TZ,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(d);
-  const h = parts.find((p) => p.type === "hour")?.value ?? "00";
-  const m = parts.find((p) => p.type === "minute")?.value ?? "00";
-  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
+  const p = getISTDateTimeParts(d);
+  if (p) return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+  try {
+    return new Intl.DateTimeFormat("sv-SE", {
+      timeZone: ATTENDANCE_TZ,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+  } catch {
+    return "";
+  }
 }
 
 export function clockTimeToInputValue(iso: string | null | undefined): string {
