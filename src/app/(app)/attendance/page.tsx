@@ -112,6 +112,6 @@ export default function AttendancePage() {
           </motion.div>
         </AnimatePresence>
       )}
-    </div>
+    </div> 
   );
 }
