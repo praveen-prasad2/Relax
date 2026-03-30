@@ -10,6 +10,7 @@ import {
   generateMonthDateKeys,
   buildAttendanceRows,
 } from "@/lib/attendance-calculator";
+import { indexAttendanceByIstDateKey } from "@/lib/attendance-queries";
 
 export const runtime = "nodejs";
 
@@ -36,13 +37,9 @@ export async function GET(req: NextRequest) {
     userId: user._id,
     date: { $gte: rangeStart, $lte: rangeEnd },
   })
-    .select("date punchIn punchOut isLeave isHoliday workingMinutes differenceMinutes")
+    .select("date punchIn punchOut isLeave isHoliday workingMinutes differenceMinutes updatedAt")
     .lean();
-  const recordByKey = new Map<string, (typeof raw)[0]>();
-  for (const r of raw) {
-    const key = toDateKey(new Date(r.date));
-    if (keySet.has(key)) recordByKey.set(key, r);
-  }
+  const recordByKey = indexAttendanceByIstDateKey(raw, keySet);
   const rows = buildAttendanceRows(dateKeys, recordByKey, todayStr);
   const todayRow = rows.find((r) => r.date === todayStr);
   return NextResponse.json(

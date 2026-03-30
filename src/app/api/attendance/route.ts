@@ -17,6 +17,7 @@ import {
 } from "@/lib/attendance-calculator";
 import { z } from "zod";
 import { logApi, logApiError } from "@/lib/server-debug";
+import { indexAttendanceByIstDateKey, findExistingAttendanceForDateKey } from "@/lib/attendance-queries";
 
 const TAG = "attendance-api";
 
@@ -64,13 +65,9 @@ export async function GET(req: NextRequest) {
     userId: user._id,
     date: { $gte: rangeStart, $lte: rangeEnd },
   })
-    .select("date punchIn punchOut isLeave isHoliday workingMinutes differenceMinutes")
+    .select("date punchIn punchOut isLeave isHoliday workingMinutes differenceMinutes updatedAt")
     .lean();
-  const recordByKey = new Map<string, (typeof raw)[0]>();
-  for (const r of raw) {
-    const key = toDateKey(new Date(r.date));
-    if (keySet.has(key)) recordByKey.set(key, r);
-  }
+  const recordByKey = indexAttendanceByIstDateKey(raw, keySet);
   const todayParam = searchParams.get("today");
   const todayStr =
     todayParam && /^\d{4}-\d{2}-\d{2}$/.test(todayParam) ? todayParam : toDateKey(new Date());
@@ -111,17 +108,9 @@ export async function POST(req: NextRequest) {
 
   const dateKey = parsed.data.date;
   const dayStart = parseDateKeyToDate(dateKey);
-  const dayEnd = new Date(dayStart.getTime() + 86400000);
   const dayName = getDayName(dayStart);
 
-  let existing = await Attendance.findOne({
-    userId: user._id,
-    date: { $gte: dayStart, $lt: dayEnd },
-  }).lean();
-  if (!existing) {
-    existing = await Attendance.findOne({ userId: user._id, date: dayStart }).lean();
-    if (existing) logApi(TAG, "found existing by exact date match (legacy row)");
-  }
+  const existing = await findExistingAttendanceForDateKey(user._id, dateKey);
   logApi(TAG, "POST merge", {
     dateKey,
     hasExisting: !!existing?._id,
@@ -185,11 +174,7 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       if (!isDuplicateKeyError(e)) throw e;
       logApi(TAG, "create duplicate key — retrying find + update");
-      let again = await Attendance.findOne({
-        userId: user._id,
-        date: { $gte: dayStart, $lt: dayEnd },
-      }).lean();
-      if (!again) again = await Attendance.findOne({ userId: user._id, date: dayStart }).lean();
+      const again = await findExistingAttendanceForDateKey(user._id, dateKey);
       if (!again?._id) throw e;
       await Attendance.updateOne({ _id: again._id }, { $set: { ...doc, date: dayStart } });
       logApi(TAG, "retry update ok", { id: String(again._id) });
