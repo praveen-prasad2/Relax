@@ -123,7 +123,7 @@ export function AttendanceTable({
     });
   };
 
-  const headerLabels = ["Date", "Day", "In (IST)", "Out (IST)", "Status", "Holiday", "Worked", "Daily Diff", "Total Diff", "Actions"];
+  const headerLabels = ["Date", "Day", "In ", "Out", "Status", "Holiday", "Worked", "Daily Diff", "Total Diff", "Actions"];
 
   const filterButtons: { key: FilterType; label: string; className: string }[] = [
     { key: "all", label: "All", className: filter === "all" ? "bg-[#cc161c] text-white" : "bg-white text-[#6B7280] border border-[#E5E7EB]" },
@@ -148,7 +148,7 @@ export function AttendanceTable({
         ))}
       </div>
       <div className="min-w-[650px] space-y-2">
-        <div className="flex flex-wrap gap-x-2 gap-y-2 px-3 py-2 text-xs font-medium text-[#6B7280] border-b border-[#E5E7EB] mb-2">
+        <div className="flex flex-wrap gap-x-6 gap-y-2 px-3 py-2 text-xs font-medium text-[#6B7280] border-b border-[#E5E7EB] mb-2">
           {headerLabels.map((l, i) => (
             <span key={i} className={i === 0 ? "min-w-[90px]" : i === 1 ? "min-w-[70px]" : i < 6 ? "min-w-[55px]" : i < 9 ? "min-w-[60px]" : "min-w-[50px]"}>
               {l}
@@ -170,13 +170,13 @@ export function AttendanceTable({
               transition={{ delay: 0 }}
               className={`rounded-xl border overflow-hidden ${
                 isHolidayRow
-                  ? `border-[#d65c62] bg-[#e07377] ${isToday ? "ring-2 ring-[#cc161c] ring-offset-1" : ""}`
+                  ? `border-[#d65c62] bg-[#e49d9f] ${isToday ? "ring-2 ring-[#cc161c] ring-offset-1" : ""}`
                   : isToday
                     ? "border-[#cc161c] bg-[#FDE8EA]/50"
                     : "border-[#E5E7EB] bg-white"
               }`}
             >
-              <div className="flex flex-wrap gap-x-2 gap-y-2 p-3 text-sm items-center">
+              <div className="flex flex-wrap gap-x-6 gap-y-2 p-3 text-sm items-center">
                 {isEditing ? (
                   <div className="flex flex-wrap gap-3 w-full">
                     <div>
