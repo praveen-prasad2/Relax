@@ -110,7 +110,7 @@ export default function AttendancePage() {
           >
             <AttendanceTable rows={data?.rows ?? []} year={year} month={month} />
           </motion.div>
-        </AnimatePresence>
+        </AnimatePresence> 
       )}
     </div> 
   );
