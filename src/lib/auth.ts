@@ -32,6 +32,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         if (user.email) token.email = user.email;
+        token.sub = user.id;
       }
       return token;
     },

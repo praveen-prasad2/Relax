@@ -16,13 +16,16 @@ import {
   ensurePunchOutAfterIn,
 } from "@/lib/attendance-calculator";
 import { z } from "zod";
+import { logApi, logApiError } from "@/lib/server-debug";
+
+const TAG = "attendance-api";
 
 const upsertSchema = z.object({
-  date: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   punchIn: z.union([z.string(), z.null()]).optional(),
   punchOut: z.union([z.string(), z.null()]).optional(),
   isLeave: z.enum(["None", "Leave", "WFH"]).optional(),
-  isHoliday: z.boolean().optional(),
+  isHoliday: z.coerce.boolean().optional(),
 });
 
 export const runtime = "nodejs";
@@ -39,10 +42,16 @@ function isDuplicateKeyError(e: unknown): boolean {
 
 export async function GET(req: NextRequest) {
   const email = await getAuthEmail(req);
-  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!email) {
+    logApi(TAG, "GET 401 — no email from auth");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   await connectDB();
   const user = await User.findOne({ email }).select("_id").lean();
-  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!user) {
+    logApi(TAG, "GET 404 — user doc missing for email");
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
   const { searchParams } = new URL(req.url);
   const year = parseInt(searchParams.get("year") || "");
   const month = parseInt(searchParams.get("month") || "");
@@ -74,21 +83,51 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const email = await getAuthEmail(req);
-  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const body = await req.json();
+  if (!email) {
+    logApi(TAG, "POST 401 — no email from auth");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch (e) {
+    logApiError(TAG, "POST body JSON parse failed", e);
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
   const parsed = upsertSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success) {
+    logApi(TAG, "POST 400 — zod validation", parsed.error.flatten());
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
   await connectDB();
   const user = await User.findOne({ email }).select("_id").lean();
-  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!user) {
+    logApi(TAG, "POST 404 — user doc missing");
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
   const dateKey = parsed.data.date;
   const dayStart = parseDateKeyToDate(dateKey);
   const dayEnd = new Date(dayStart.getTime() + 86400000);
   const dayName = getDayName(dayStart);
-  const existing = await Attendance.findOne({
+
+  let existing = await Attendance.findOne({
     userId: user._id,
     date: { $gte: dayStart, $lt: dayEnd },
   }).lean();
+  if (!existing) {
+    existing = await Attendance.findOne({ userId: user._id, date: dayStart }).lean();
+    if (existing) logApi(TAG, "found existing by exact date match (legacy row)");
+  }
+  logApi(TAG, "POST merge", {
+    dateKey,
+    hasExisting: !!existing?._id,
+    punchInSent: parsed.data.punchIn !== undefined,
+    punchOutSent: parsed.data.punchOut !== undefined,
+  });
 
   const punchIn: Date | null =
     parsed.data.punchIn !== undefined
@@ -131,23 +170,33 @@ export async function POST(req: NextRequest) {
 
   try {
     if (existing?._id) {
-      await Attendance.updateOne({ _id: existing._id }, { $set: doc });
+      const res = await Attendance.updateOne({ _id: existing._id }, { $set: doc });
+      logApi(TAG, "updateOne result", { matched: res.matchedCount, modified: res.modifiedCount });
+      if (res.matchedCount === 0) {
+        logApiError(TAG, "updateOne matched 0 documents — _id mismatch?", existing._id);
+        return NextResponse.json({ error: "Could not update attendance row" }, { status: 409 });
+      }
       return NextResponse.json({ ok: true, id: String(existing._id) });
     }
     try {
       const created = await Attendance.create({ userId: user._id, ...doc });
+      logApi(TAG, "create ok", { id: String(created._id) });
       return NextResponse.json({ ok: true, id: String(created._id) });
     } catch (e) {
       if (!isDuplicateKeyError(e)) throw e;
-      const again = await Attendance.findOne({
+      logApi(TAG, "create duplicate key — retrying find + update");
+      let again = await Attendance.findOne({
         userId: user._id,
         date: { $gte: dayStart, $lt: dayEnd },
       }).lean();
+      if (!again) again = await Attendance.findOne({ userId: user._id, date: dayStart }).lean();
       if (!again?._id) throw e;
       await Attendance.updateOne({ _id: again._id }, { $set: { ...doc, date: dayStart } });
+      logApi(TAG, "retry update ok", { id: String(again._id) });
       return NextResponse.json({ ok: true, id: String(again._id) });
     }
   } catch (e) {
+    logApiError(TAG, "POST save failed", e);
     const msg = e instanceof Error ? e.message : "Save failed";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
